@@ -48,7 +48,7 @@ class MomentBasedLbMethod(AbstractLbMethod):
         self._cqc = conserved_quantity_computation
         self._force_model = force_model
         self._zero_centered = zero_centered
-        self.fraction_field = fraction_field
+        self._fraction_field = fraction_field
         self._weights = None
         self._moment_transform_class = moment_transform_class
 
@@ -56,6 +56,10 @@ class MomentBasedLbMethod(AbstractLbMethod):
     def force_model(self):
         """Force model employed by this method."""
         return self._force_model
+
+    @property
+    def fraction_field(self):
+        return self._fraction_field
 
     @property
     def relaxation_info_dict(self):
@@ -176,8 +180,8 @@ class MomentBasedLbMethod(AbstractLbMethod):
     def get_collision_rule(self, conserved_quantity_equations: AssignmentCollection = None,
                            pre_simplification: bool = True) -> LbmCollisionRule:
 
-        if self.fraction_field is not None:
-            relaxation_rates_modifier = (1.0 - self.fraction_field.center)
+        if self._fraction_field is not None:
+            relaxation_rates_modifier = (1.0 - self._fraction_field)
             rr_sub_expressions, d = self._generate_symbolic_relaxation_matrix(
                 relaxation_rates_modifier=relaxation_rates_modifier)
         else:

@@ -26,7 +26,14 @@ def get_field_accesses(lb_method, pdfs, streaming_pattern, previous_timestep, pr
     return field_accesses
 
 
-def pdf_initialization_assignments(lb_method, density, velocity, pdfs,
+def get_individual_or_common_fraction_field(psm_config):
+    if psm_config.individual_fraction_field is not None:
+        return psm_config.individual_fraction_field
+    else:
+        return psm_config.fraction_field
+
+
+def pdf_initialization_assignments(lb_method, density, velocity, pdfs, psm_config=None,
                                    streaming_pattern='pull', previous_timestep=Timestep.BOTH,
                                    set_pre_collision_pdfs=False):
     """Assignments to initialize the pdf field with equilibrium"""
@@ -42,10 +49,35 @@ def pdf_initialization_assignments(lb_method, density, velocity, pdfs,
     setter_eqs = lb_method.get_equilibrium(conserved_quantity_equations=inp_eqs)
     setter_eqs = setter_eqs.new_with_substitutions({sym: field_accesses[i]
                                                     for i, sym in enumerate(lb_method.post_collision_pdf_symbols)})
+
+    if lb_method.fraction_field is not None:
+        if psm_config is None:
+            raise ValueError("If setting up LBM with PSM, please specify a PSM config in the macroscopic setter")
+        else:
+            for equ in setter_eqs:
+                if equ.lhs in lb_method.first_order_equilibrium_moment_symbols:
+                    pos = lb_method.first_order_equilibrium_moment_symbols.index(equ.lhs)
+                    new_rhs = 0
+                    if isinstance(equ.rhs, sp.core.Add):
+                        for summand in equ.rhs.args:
+                            if summand in velocity:
+                                new_rhs += (1.0 - psm_config.fraction_field.center) * summand
+                            else:
+                                new_rhs += summand.subs(lb_method.fraction_field, psm_config.fraction_field.center)
+                    else:
+                        new_rhs += (1.0 - psm_config.fraction_field.center) * equ.rhs
+
+                    fraction_field = get_individual_or_common_fraction_field(psm_config)
+                    for p in range(psm_config.max_particles_per_cell):
+                        new_rhs += psm_config.object_velocity_field(p * lb_method.dim + pos) * fraction_field.center(p)
+
+                    setter_eqs.subexpressions.remove(equ)
+                    setter_eqs.subexpressions.append(Assignment(equ.lhs, new_rhs))
+
     return setter_eqs
 
 
-def macroscopic_values_getter(lb_method, density, velocity, pdfs,
+def macroscopic_values_getter(lb_method, density, velocity, pdfs, psm_config=None,
                               streaming_pattern='pull', previous_timestep=Timestep.BOTH,
                               use_pre_collision_pdfs=False):
 
@@ -58,7 +90,28 @@ def macroscopic_values_getter(lb_method, density, velocity, pdfs,
         output_spec['velocity'] = velocity
     if density is not None:
         output_spec['density'] = density
-    return cqc.output_equations_from_pdfs(field_accesses, output_spec)
+    getter_equ = cqc.output_equations_from_pdfs(field_accesses, output_spec)
+
+    if lb_method.fraction_field is not None:
+        if psm_config.fraction_field is None:
+            raise ValueError("If setting up LBM with PSM, please specify a PSM config in the macroscopic getter")
+        else:
+            if lb_method.force_model is not None:
+                for equ in getter_equ:
+                    if equ.lhs in lb_method.force_model.symbolic_force_vector:
+                        new_rhs = equ.rhs.subs(lb_method.fraction_field, psm_config.fraction_field.center)
+                        getter_equ.subexpressions.remove(equ)
+                        getter_equ.subexpressions.append(Assignment(equ.lhs, new_rhs))
+
+            for i, equ in enumerate(getter_equ.main_assignments[-lb_method.dim:]):
+                new_rhs = (1.0 - psm_config.fraction_field.center) * equ.rhs
+                fraction_field = get_individual_or_common_fraction_field(psm_config)
+                for p in range(psm_config.max_particles_per_cell):
+                    new_rhs += psm_config.object_velocity_field(p * lb_method.dim + i) * fraction_field.center(p)
+                getter_equ.main_assignments.remove(equ)
+                getter_equ.main_assignments.append(Assignment(equ.lhs, new_rhs))
+        getter_equ.topological_sort()
+    return getter_equ
 
 
 macroscopic_values_setter = pdf_initialization_assignments
