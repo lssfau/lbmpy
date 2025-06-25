@@ -11,3 +11,4 @@ Contributors:
   - Rudolf Weeber <weeber@icp.uni-stuttgart.de>
   - Christian Godenschwager <christian.godenschwager@fau.de>
   - Jan Hönig <jan.hoenig@fau.de>
+  - Philipp Suffa <philipp.suffa@fau.de>

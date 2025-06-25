@@ -55,7 +55,7 @@ class CentralMomentBasedLbMethod(AbstractLbMethod):
 
     def __init__(self, stencil, equilibrium, relaxation_dict,
                  conserved_quantity_computation=None,
-                 force_model=None, zero_centered=False,
+                 force_model=None, zero_centered=False, fraction_field=None,
                  central_moment_transform_class=BinomialChimeraTransform):
         assert isinstance(conserved_quantity_computation, AbstractConservedQuantityComputation)
         super(CentralMomentBasedLbMethod, self).__init__(stencil)
@@ -65,6 +65,7 @@ class CentralMomentBasedLbMethod(AbstractLbMethod):
         self._cqc = conserved_quantity_computation
         self._force_model = force_model
         self._zero_centered = zero_centered
+        self._fraction_field = fraction_field
         self._weights = None
         self._central_moment_transform_class = central_moment_transform_class
 
@@ -72,6 +73,10 @@ class CentralMomentBasedLbMethod(AbstractLbMethod):
     def force_model(self):
         """Force model employed by this method."""
         return self._force_model
+
+    @property
+    def fraction_field(self):
+        return self._fraction_field
 
     @property
     def relaxation_info_dict(self):

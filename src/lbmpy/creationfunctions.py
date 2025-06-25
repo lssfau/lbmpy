@@ -67,7 +67,8 @@ from lbmpy.enums import Stencil, Method, ForceModel, CollisionSpace, SubgridScal
 import lbmpy.forcemodels as forcemodels
 from lbmpy.fieldaccess import CollideOnlyInplaceAccessor, PdfFieldAccessor, PeriodicTwoFieldsAccessor
 from lbmpy.fluctuatinglb import add_fluctuations_to_collision_rule
-from lbmpy.partially_saturated_cells import add_psm_to_collision_rule, PSMConfig
+from lbmpy.partially_saturated_cells import (replace_by_psm_collision_rule, PSMConfig,
+                                             add_psm_solid_collision_to_collision_rule)
 from lbmpy.non_newtonian_models import add_cassons_model, CassonsParameters
 from lbmpy.methods import (create_mrt_orthogonal, create_mrt_raw, create_central_moment,
                            create_srt, create_trt, create_trt_kbc)
@@ -468,7 +469,7 @@ class LBMConfig:
         }
 
         if self.psm_config is not None and self.psm_config.fraction_field is not None:
-            self.force = [(1.0 - self.psm_config.fraction_field.center) * f for f in self.force]
+            self.force = [(1.0 - self.psm_config.fraction_field_symbol) * f for f in self.force]
 
         if isinstance(self.force_model, str):
             new_force_model = ForceModel[self.force_model.upper()]
@@ -684,11 +685,6 @@ def create_lb_collision_rule(lb_method=None, lbm_config=None, lbm_optimisation=N
     else:
         collision_rule = lb_method.get_collision_rule(pre_simplification=pre_simplification)
 
-    if lbm_config.psm_config is not None:
-        if lbm_config.psm_config.fraction_field is None or lbm_config.psm_config.object_velocity_field is None:
-            raise ValueError("Specify a fraction and object velocity field in the PSM Config")
-        collision_rule = add_psm_to_collision_rule(collision_rule, lbm_config.psm_config)
-
     if lbm_config.galilean_correction:
         from lbmpy.methods.cumulantbased import add_galilean_correction
         collision_rule = add_galilean_correction(collision_rule)
@@ -705,6 +701,11 @@ def create_lb_collision_rule(lb_method=None, lbm_config=None, lbm_optimisation=N
                                                      shear_relaxation_rate=lbm_config.relaxation_rates[0],
                                                      bulk_relaxation_rate=lbm_config.relaxation_rates[1],
                                                      limiter=cumulant_limiter)
+
+    if lbm_config.psm_config is not None:
+        if lbm_config.psm_config.fraction_field is None or lbm_config.psm_config.object_velocity_field is None:
+            raise ValueError("Specify a fraction and object velocity field in the PSM Config")
+        collision_rule = replace_by_psm_collision_rule(collision_rule, lbm_config.psm_config)
 
     if lbm_config.entropic:
         if lbm_config.subgrid_scale_model or lbm_config.cassons:
@@ -783,7 +784,7 @@ def create_lb_method(lbm_config=None, **params):
     if lbm_config.psm_config is None:
         fraction_field = None
     else:
-        fraction_field = lbm_config.psm_config.fraction_field
+        fraction_field = lbm_config.psm_config.fraction_field_symbol
 
     common_params = {
         'compressible': lbm_config.compressible,
@@ -869,49 +870,36 @@ def create_lb_method(lbm_config=None, **params):
 
 
 def create_psm_update_rule(lbm_config, lbm_optimisation):
-    node_collection = []
 
-    # Use regular lb update rule for no overlapping particles
-    config_without_psm = copy.deepcopy(lbm_config)
-    config_without_psm.psm_config = None
-    # TODO: the force is still multiplied by (1.0 - self.psm_config.fraction_field.center)
-    #  (should not harm if memory bound since self.psm_config.fraction_field.center should always be 0.0)
+    if lbm_config.psm_config is None:
+        raise ValueError("Specify a PSM Config in the LBM Config, when creating a psm update rule")
+
+    config_without_particles = copy.deepcopy(lbm_config)
+    config_without_particles.psm_config.max_particles_per_cell = 0
+
     lb_update_rule = create_lb_update_rule(
-        lbm_config=config_without_psm, lbm_optimisation=lbm_optimisation
-    )
-    node_collection.append(
-        Conditional(
-            lbm_config.psm_config.fraction_field.center(0) <= 0.0,
-            Block(lb_update_rule.all_assignments),
-        )
-    )
+        lbm_config=config_without_particles, lbm_optimisation=lbm_optimisation)
 
-    # Only one particle, i.e., no individual_fraction_field is provided
+    node_collection = lb_update_rule.all_assignments
+
     if lbm_config.psm_config.individual_fraction_field is None:
-        assert lbm_config.psm_config.MaxParticlesPerCell == 1
+        assert lbm_config.psm_config.max_particles_per_cell == 1
+        fraction_field = lbm_config.psm_config.fraction_field
+    else:
+        fraction_field = lbm_config.psm_config.individual_fraction_field
+
+    for p in range(lbm_config.psm_config.max_particles_per_cell):
+
+        psm_solid_collision = add_psm_solid_collision_to_collision_rule(lb_update_rule, lbm_config, p)
         psm_update_rule = create_lb_update_rule(
-            lbm_config=lbm_config, lbm_optimisation=lbm_optimisation
-        )
+            collision_rule=psm_solid_collision, lbm_config=lbm_config, lbm_optimisation=lbm_optimisation)
+
         node_collection.append(
             Conditional(
-                lbm_config.psm_config.fraction_field.center(0) > 0.0,
+                fraction_field.center(p) > 0.0,
                 Block(psm_update_rule.all_assignments),
             )
         )
-    else:
-        for p in range(lbm_config.psm_config.MaxParticlesPerCell):
-            # Add psm update rule for p overlapping particles
-            config_with_p_particles = copy.deepcopy(lbm_config)
-            config_with_p_particles.psm_config.MaxParticlesPerCell = p + 1
-            psm_update_rule = create_lb_update_rule(
-                lbm_config=config_with_p_particles, lbm_optimisation=lbm_optimisation
-            )
-            node_collection.append(
-                Conditional(
-                    lbm_config.psm_config.individual_fraction_field.center(p) > 0.0,
-                    Block(psm_update_rule.all_assignments),
-                )
-            )
 
     return NodeCollection(node_collection)
 

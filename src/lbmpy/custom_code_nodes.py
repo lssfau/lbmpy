@@ -68,7 +68,7 @@ class LbmWeightInfo(CustomCodeNode):
         weights = [f"(({self.weights_symbol.dtype.c_name})({str(w.evalf(17))}))" for w in lb_method.weights]
         weights = ", ".join(weights)
         w_sym = self.weights_symbol
-        code = f"const {self.weights_symbol.dtype.c_name} {w_sym.name} [] = {{{ weights }}};\n"
+        code = f"const {self.weights_symbol.dtype.c_name} {w_sym.name} [] = {{{weights}}};\n"
         super(LbmWeightInfo, self).__init__(code, symbols_read=set(), symbols_defined={w_sym})
 
     def weight_of_direction(self, dir_idx, lb_method=None):
