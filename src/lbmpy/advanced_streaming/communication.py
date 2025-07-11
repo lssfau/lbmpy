@@ -1,5 +1,5 @@
 import itertools
-from pystencils import CreateKernelConfig, Field, Assignment, AssignmentCollection
+from pystencils import CreateKernelConfig, Field, Assignment, AssignmentCollection, Target
 from pystencils.slicing import (
     shift_slice,
     get_slice_before_ghost_layer,
@@ -14,7 +14,6 @@ from lbmpy.advanced_streaming.utility import (
     numeric_offsets,
 )
 from pystencils.datahandling import SerialDataHandling
-from pystencils.enums import Target
 from itertools import chain
 
 

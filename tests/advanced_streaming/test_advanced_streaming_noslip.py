@@ -11,7 +11,7 @@ from lbmpy.stencils import LBStencil
 import pystencils as ps
 
 from pystencils.boundaries.createindexlist import numpy_data_type_for_boundary_object
-from pystencils.typing import TypedSymbol, create_type
+from pystencils import TypedSymbol
 from pystencils.field import Field, FieldType
 
 import pytest
@@ -43,7 +43,7 @@ def test_advanced_streaming_noslip_single_cell(stencil, streaming_pattern, prev_
     index_struct_dtype = numpy_data_type_for_boundary_object(noslip, stencil.D)
 
     index_field = Field('indexVector', FieldType.INDEXED, index_struct_dtype, layout=[0],
-                        shape=(TypedSymbol("indexVectorSize", create_type(np.int64)), 1), strides=(1, 1))
+                        shape=(TypedSymbol("indexVectorSize", np.int32), 1), strides=(1, 1))
     index_vector = np.array([pos + (d,) for d in range(stencil.Q)], dtype=index_struct_dtype)
 
     ast = create_lattice_boltzmann_boundary_kernel(pdf_field,

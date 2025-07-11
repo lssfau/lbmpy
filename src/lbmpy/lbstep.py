@@ -10,9 +10,16 @@ from lbmpy.macroscopic_value_kernels import (
     create_advanced_velocity_setter_collision_rule, pdf_initialization_assignments)
 from lbmpy.simplificationfactory import create_simplification_strategy
 from lbmpy.stencils import LBStencil
-from pystencils import create_data_handling, create_kernel, make_slice, Target, Backend
+
+from pystencils import CreateKernelConfig
+from pystencils import create_data_handling, create_kernel, make_slice, Target
 from pystencils.slicing import SlicedGetter
 from pystencils.timeloop import TimeLoop
+
+
+from ._compat import IS_PYSTENCILS_2
+if not IS_PYSTENCILS_2:
+    from pystencils import Backend
 
 
 class LatticeBoltzmannStep:
@@ -24,7 +31,9 @@ class LatticeBoltzmannStep:
                  velocity_input_array_name=None, time_step_order='stream_collide', flag_interface=None,
                  alignment_if_vectorized=64, fixed_loop_sizes=True,
                  timeloop_creation_function=TimeLoop,
-                 lbm_config=None, lbm_optimisation=None, config=None, **method_parameters):
+                 lbm_config=None, lbm_optimisation=None,
+                 config: CreateKernelConfig | None = None,
+                 **method_parameters):
 
         if optimization is None:
             optimization = {}
@@ -36,7 +45,10 @@ class LatticeBoltzmannStep:
                 raise ValueError("When passing a data_handling, the domain_size parameter can not be specified")
 
         if config is not None:
-            target = config.target
+            if IS_PYSTENCILS_2:
+                target = config.get_target()
+            else:
+                target = config.target
         else:
             target = optimization.get('target', Target.CPU)
 
@@ -60,7 +72,11 @@ class LatticeBoltzmannStep:
                                                                               lbm_config, lbm_optimisation, config)
 
         # the parallel datahandling understands only numpy datatypes. Strings lead to an errors
-        field_dtype = config.data_type.default_factory().numpy_dtype
+        if IS_PYSTENCILS_2:
+            from pystencils import create_type
+            field_dtype = create_type(config.get_option("default_dtype")).numpy_dtype
+        else:
+            field_dtype = config.data_type.default_factory().numpy_dtype
 
         if lbm_kernel:
             q = lbm_kernel.method.stencil.Q
@@ -75,12 +91,21 @@ class LatticeBoltzmannStep:
         self.density_data_name = name + "_density" if density_data_name is None else density_data_name
         self.density_data_index = density_data_index
 
-        self._gpu = target == Target.GPU
+        if IS_PYSTENCILS_2:
+            self._gpu = target.is_gpu()
+        else:
+            self._gpu = target == Target.GPU
+
         layout = lbm_optimisation.field_layout
 
         alignment = False
-        if config.backend == Backend.C and config.cpu_vectorize_info:
-            alignment = alignment_if_vectorized
+
+        if IS_PYSTENCILS_2:
+            if config.get_target().is_vector_cpu() and config.cpu.vectorize.enable:
+                alignment = alignment_if_vectorized
+        else:
+            if config.backend == Backend.C and config.cpu_vectorize_info:
+                alignment = alignment_if_vectorized
 
         self._data_handling.add_array(self._pdf_arr_name, values_per_cell=q, gpu=self._gpu, layout=layout,
                                       latex_name='src', dtype=field_dtype, alignment=alignment)
@@ -150,10 +175,14 @@ class LatticeBoltzmannStep:
         self._sync_tmp = data_handling.synchronization_function([self._tmp_arr_name], stencil_name, target,
                                                                 stencil_restricted=True)
 
-        self._boundary_handling = LatticeBoltzmannBoundaryHandling(self.method, self._data_handling, self._pdf_arr_name,
-                                                                   name=name + "_boundary_handling",
-                                                                   flag_interface=flag_interface,
-                                                                   target=target, openmp=config.cpu_openmp)
+        self._boundary_handling = LatticeBoltzmannBoundaryHandling(
+            self.method, self._data_handling, self._pdf_arr_name,
+            name=name + "_boundary_handling",
+            flag_interface=flag_interface,
+            target=target,
+            openmp=config.cpu_openmp,
+            **({"default_dtype": field_dtype} if IS_PYSTENCILS_2 else dict())
+        )
 
         self._lbm_config = lbm_config
         self._lbm_optimisation = lbm_optimisation
@@ -223,7 +252,7 @@ class LatticeBoltzmannStep:
     @property
     def config(self):
         """Configutation of pystencils parameters"""
-        return self.config
+        return self._config
 
     def _get_slice(self, data_name, slice_obj, masked):
         if slice_obj is None:
@@ -439,12 +468,19 @@ class LatticeBoltzmannStep:
         rho_field = rho_field.center if self.density_data_index is None else rho_field(self.density_data_index)
         vel_field = self._data_handling.fields[self.velocity_data_name]
 
+        if IS_PYSTENCILS_2:
+            gen_config = CreateKernelConfig(target=Target.CPU)
+            gen_config.cpu.openmp.enable = self._config.cpu.openmp.get_option("enable")
+            gen_config.default_dtype = self._config.get_option("default_dtype")
+        else:
+            gen_config = CreateKernelConfig(target=Target.CPU, cpu_openmp=self._config.cpu_openmp)
+
         getter_eqs = cqc.output_equations_from_pdfs(pdf_field.center_vector,
                                                     {'density': rho_field, 'velocity': vel_field})
-        getter_kernel = create_kernel(getter_eqs, target=Target.CPU, cpu_openmp=self._config.cpu_openmp).compile()
+        getter_kernel = create_kernel(getter_eqs, config=gen_config).compile()
 
         setter_eqs = pdf_initialization_assignments(lb_method, rho_field,
                                                     vel_field.center_vector, pdf_field.center_vector)
         setter_eqs = create_simplification_strategy(lb_method)(setter_eqs)
-        setter_kernel = create_kernel(setter_eqs, target=Target.CPU, cpu_openmp=self._config.cpu_openmp).compile()
+        setter_kernel = create_kernel(setter_eqs, config=gen_config).compile()
         return getter_kernel, setter_kernel

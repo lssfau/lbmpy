@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import sympy as sp
 
-from pystencils.simp import (SimplificationStrategy, sympy_cse)
+from pystencils.simp import SimplificationStrategy, sympy_cse
 
 from lbmpy.moments import (
     exponents_to_polynomial_representations, extract_monomials, exponent_tuple_sort_key)

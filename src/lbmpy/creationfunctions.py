@@ -58,10 +58,9 @@ from dataclasses import dataclass, field, replace
 from typing import Union, List, Tuple, Any, Type, Iterable
 from warnings import warn, filterwarnings
 
-import lbmpy.moment_transforms
-import pystencils.astnodes
+from ._compat import IS_PYSTENCILS_2
+
 import sympy as sp
-import sympy.core.numbers
 
 from lbmpy.enums import Stencil, Method, ForceModel, CollisionSpace, SubgridScaleModel
 import lbmpy.forcemodels as forcemodels
@@ -82,16 +81,21 @@ from lbmpy.stencils import LBStencil
 from lbmpy.turbulence_models import add_sgs_model
 from lbmpy.updatekernels import create_lbm_kernel, create_stream_pull_with_output_kernel
 from lbmpy.advanced_streaming.utility import Timestep, get_accessor
+from .forcemodels import AbstractForceModel
+
+import pystencils
 from pystencils import CreateKernelConfig, create_kernel
-from pystencils.astnodes import Conditional, Block
 from pystencils.cache import disk_cache_no_fallback
-from pystencils.node_collection import NodeCollection
-from pystencils.typing import collate_types
 from pystencils.field import Field
 from pystencils.simp import sympy_cse, SimplificationStrategy
 # needed for the docstring
 from lbmpy.methods.abstractlbmethod import LbmCollisionRule, AbstractLbMethod
 from lbmpy.methods.cumulantbased import CumulantBasedLbMethod
+
+if IS_PYSTENCILS_2:
+    from pystencils import Kernel as KernelFunction
+else:
+    from pystencils.astnodes import KernelFunction
 
 # Filter out JobLib warnings. They are not useful for use:
 # https://github.com/joblib/joblib/issues/683
@@ -103,7 +107,7 @@ class LBMConfig:
     """
     **Below all parameters for the LBMConfig are explained**
     """
-    stencil: lbmpy.stencils.LBStencil = LBStencil(Stencil.D2Q9)
+    stencil: LBStencil = LBStencil(Stencil.D2Q9)
     """
     All stencils are defined in :class:`lbmpy.enums.Stencil`. From that :class:`lbmpy.stencils.LBStencil` 
     class will be created
@@ -162,7 +166,7 @@ class LBMConfig:
     truncated. Order 2 is sufficient to approximate Navier-Stokes. This parameter has no effect on cumulant-based
     methods, whose equilibrium terms have no contributions above order one.
     """
-    c_s_sq: sympy.Rational = sp.Rational(1, 3)
+    c_s_sq: sp.Expr = sp.Rational(1, 3)
     """
     The squared lattice speed of sound used to derive the LB method. It is very uncommon to use a value different 
     to 1 / 3.
@@ -179,7 +183,7 @@ class LBMConfig:
     If this argument is not provided, Gram-Schmidt orthogonalisation of the default modes is performed.
     """
 
-    force_model: Union[lbmpy.forcemodels.AbstractForceModel, ForceModel] = None
+    force_model: Union[AbstractForceModel, ForceModel] = None
     """
     Force model to determine how forcing terms enter the collision rule.
     Possibilities are defined in :class: `lbmpy.enums.ForceModel`
@@ -339,9 +343,9 @@ class LBMConfig:
     Instance of :class:`lbmpy.methods.LbmCollisionRule`. If this parameter is `None`,
     the update rule is derived via *create_lb_update_rule*.
     """
-    ast: pystencils.astnodes.KernelFunction = None
+    ast: KernelFunction = None
     """
-    Instance of *pystencils.astnodes.KernelFunction*. If this parameter is `None`,
+    Instance of *pystencils.KernelFunction*. If this parameter is `None`,
     the ast is derived via `create_lb_ast`.
     """
 
@@ -556,7 +560,6 @@ def create_lb_function(ast=None, lbm_config=None, lbm_optimisation=None, config=
 
     res.method = ast.method
     res.update_rule = ast.update_rule
-    res.ast = ast
     return res
 
 
@@ -572,9 +575,7 @@ def create_lb_ast(update_rule=None, lbm_config=None, lbm_optimisation=None, conf
         update_rule = create_lb_update_rule(lbm_config.collision_rule, lbm_config=lbm_config,
                                             lbm_optimisation=lbm_optimisation, config=config)
 
-    field_types = set(fa.field.dtype for fa in update_rule.defined_symbols if isinstance(fa, Field.Access))
-
-    config = replace(config, data_type=collate_types(field_types), ghost_layers=1)
+    config = replace(config, ghost_layers=1)
     ast = create_kernel(update_rule, config=config)
 
     ast.method = update_rule.method
@@ -600,7 +601,11 @@ def create_lb_update_rule(collision_rule=None, lbm_config=None, lbm_optimisation
 
     lb_method = collision_rule.method
 
-    field_data_type = config.data_type[lbm_config.field_name].numpy_dtype
+    if IS_PYSTENCILS_2:
+        fallback_field_data_type = config.get_option("default_dtype")
+    else:
+        fallback_field_data_type = config.data_type[lbm_config.field_name].numpy_dtype
+
     q = collision_rule.method.stencil.Q
 
     if lbm_optimisation.symbolic_field is not None:
@@ -608,16 +613,17 @@ def create_lb_update_rule(collision_rule=None, lbm_config=None, lbm_optimisation
     elif lbm_optimisation.field_size:
         field_size = tuple([s + 2 for s in lbm_optimisation.field_size] + [q])
         src_field = Field.create_fixed_size(lbm_config.field_name, field_size, index_dimensions=1,
-                                            layout=lbm_optimisation.field_layout, dtype=field_data_type)
+                                            layout=lbm_optimisation.field_layout, dtype=fallback_field_data_type)
     else:
         src_field = Field.create_generic(lbm_config.field_name, spatial_dimensions=collision_rule.method.dim,
-                                         index_shape=(q,), layout=lbm_optimisation.field_layout, dtype=field_data_type)
+                                         index_shape=(q,), layout=lbm_optimisation.field_layout,
+                                         dtype=fallback_field_data_type)
 
     if lbm_optimisation.symbolic_temporary_field is not None:
         dst_field = lbm_optimisation.symbolic_temporary_field
     else:
         dst_field = src_field.new_field_with_different_name(lbm_config.temporary_field_name)
-
+   
     kernel_type = lbm_config.kernel_type
     if kernel_type == 'stream_pull_only':
         update_rule = create_stream_pull_with_output_kernel(lb_method, src_field, dst_field, lbm_config.output)
@@ -870,6 +876,15 @@ def create_lb_method(lbm_config=None, **params):
 
 
 def create_psm_update_rule(lbm_config, lbm_optimisation):
+    if IS_PYSTENCILS_2:
+        raise NotImplementedError(
+            "`create_psm_update_rule` is not yet available when using pystencils 2.0. "
+            "To instead derive a (potentially less efficient) PSM kernel without branches, "
+            "use `create_lb_update_rule` with a `PsmConfig` object instead."
+        )
+    
+    from pystencils.astnodes import Conditional, Block
+    from pystencils.node_collection import NodeCollection
 
     if lbm_config.psm_config is None:
         raise ValueError("Specify a PSM Config in the LBM Config, when creating a psm update rule")

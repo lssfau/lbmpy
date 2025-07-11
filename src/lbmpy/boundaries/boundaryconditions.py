@@ -2,20 +2,37 @@ import abc
 from enum import Enum, auto
 from warnings import warn
 
-from pystencils import Assignment, Field
-from pystencils.simp.assignment_collection import AssignmentCollection
+from pystencils import Assignment, AssignmentCollection, Field, TypedSymbol
 from pystencils.stencil import offset_to_direction_string, direction_string_to_offset, inverse_direction
 from pystencils.sympyextensions import get_symmetric_part, simplify_by_equality, scalar_product
-from pystencils.typing import create_type, TypedSymbol
 
 from lbmpy.advanced_streaming.utility import AccessPdfValues, Timestep
-from lbmpy.custom_code_nodes import (NeighbourOffsetArrays, MirroredStencilDirections, LbmWeightInfo,
-                                     TranslationArraysNode)
 from lbmpy.maxwellian_equilibrium import discrete_equilibrium
 from lbmpy.simplificationfactory import create_simplification_strategy
 
 import sympy as sp
 import numpy as np
+
+from .._compat import IS_PYSTENCILS_2
+
+if IS_PYSTENCILS_2:
+    from pystencils import create_type
+    from pystencils.sympyextensions.typed_sympy import CastFunc
+    from pystencils.types.quick import Arr
+    from lbmpy.lookup_tables import (
+        NeighbourOffsetArrays,
+        MirroredStencilDirections,
+        LbmWeightInfo,
+        TranslationArraysNode
+    )
+else:
+    from pystencils.typing import create_type, CastFunc
+    from lbmpy.custom_code_nodes import (
+        NeighbourOffsetArrays,
+        MirroredStencilDirections,
+        LbmWeightInfo,
+        TranslationArraysNode
+    )
 
 
 class LbBoundary(abc.ABC):
@@ -130,6 +147,8 @@ class NoSlip(LbBoundary):
             force = sp.Symbol("f")
             subexpressions = [Assignment(force, sp.Float(2.0) * f_out(dir_symbol))]
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
+            if IS_PYSTENCILS_2:
+                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
         else:
@@ -211,6 +230,8 @@ class NoSlipLinearBouzidi(LbBoundary):
             force = sp.Symbol("f")
             subexpressions.append(Assignment(force, f_xf + rhs))
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
+            if IS_PYSTENCILS_2:
+                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
 
@@ -239,9 +260,14 @@ class QuadraticBounceBack(LbBoundary):
         self.data_type = data_type
         self.init_wall_distance = init_wall_distance
         self.equilibrium_values_name = "f_eq"
-        self.inv_dir_symbol = TypedSymbol("inv_dir", create_type("int32"))
 
         super(QuadraticBounceBack, self).__init__(name, calculate_force_on_boundary)
+
+    def inv_dir_symbol(self, stencil):
+        if IS_PYSTENCILS_2:
+            return TypedSymbol("inv_dir", Arr(create_type("int32"), stencil.Q))
+        else:
+            return TypedSymbol("inv_dir", create_type("int32"))
 
     @property
     def additional_data(self):
@@ -273,9 +299,15 @@ class QuadraticBounceBack(LbBoundary):
         """
         stencil = lb_method.stencil
         inv_directions = [str(stencil.index(inverse_direction(direction))) for direction in stencil]
-        dtype = self.inv_dir_symbol.dtype
-        name = self.inv_dir_symbol.name
-        inverse_dir_node = TranslationArraysNode([(dtype, name, inv_directions), ], {self.inv_dir_symbol})
+        
+        if IS_PYSTENCILS_2:
+            inverse_dir_node = TranslationArraysNode([(self.inv_dir_symbol(stencil), inv_directions), ])
+        else:
+            inv_dir_symbol = self.inv_dir_symbol(stencil)
+            dtype = inv_dir_symbol.dtype
+            name = inv_dir_symbol.name
+            inverse_dir_node = TranslationArraysNode([(dtype, name, inv_directions), ], {inv_dir_symbol})
+        
         return [LbmWeightInfo(lb_method, self.data_type), inverse_dir_node, NeighbourOffsetArrays(lb_method.stencil)]
 
     @staticmethod
@@ -293,7 +325,7 @@ class QuadraticBounceBack(LbBoundary):
 
     def __call__(self, f_out, f_in, dir_symbol, inv_dir, lb_method, index_field, force_vector):
         omega = self.relaxation_rate
-        inv = sp.IndexedBase(self.inv_dir_symbol, shape=(1,))[dir_symbol]
+        inv = sp.IndexedBase(self.inv_dir_symbol(lb_method.stencil), shape=(1,))[dir_symbol]
         weight_info = LbmWeightInfo(lb_method, data_type=self.data_type)
         weight_of_direction = weight_info.weight_of_direction
         pdf_field_accesses = [f_out(i) for i in range(len(lb_method.stencil))]
@@ -317,13 +349,19 @@ class QuadraticBounceBack(LbBoundary):
         subexpressions.append(Assignment(weight, weight_of_direction(dir_symbol, lb_method)))
         subexpressions.append(Assignment(weight_inv, weight_of_direction(inv, lb_method)))
 
+        if IS_PYSTENCILS_2:
+            cast_offset = CastFunc.as_numeric
+        else:
+            def cast_offset(x):
+                return x
+
         for i in range(lb_method.stencil.D):
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            subexpressions.append(Assignment(v[i], offset[i]))
+            subexpressions.append(Assignment(v[i], cast_offset(offset[i])))
 
         for i in range(lb_method.stencil.D):
             offset = NeighbourOffsetArrays.neighbour_offset(inv, lb_method.stencil)
-            subexpressions.append(Assignment(v_inv[i], offset[i]))
+            subexpressions.append(Assignment(v_inv[i], cast_offset(offset[i])))
 
         cqc = lb_method.conserved_quantity_computation
         rho = cqc.density_symbol
@@ -348,6 +386,8 @@ class QuadraticBounceBack(LbBoundary):
             force = sp.Symbol("f")
             subexpressions.append(Assignment(force, f_xf + result))
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
+            if IS_PYSTENCILS_2:
+                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
 
@@ -469,7 +509,7 @@ class FreeSlip(LbBoundary):
         neighbor_offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
         if self.normal_direction:
             tangential_offset = tuple(offset + normal for offset, normal in zip(neighbor_offset, self.normal_direction))
-            mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(self.mirror_axis)
+            mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(self.mirror_axis, self.stencil)
             mirrored_direction = inv_dir[sp.IndexedBase(mirrored_stencil_symbol, shape=(1,))[dir_symbol]]
         else:
             normal_direction = list()
@@ -610,7 +650,7 @@ class WallFunctionBounce(LbBoundary):
         # neighbour offset symbols are basically the stencil directions defined in stencils.py:L130ff.
         neighbor_offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
         tangential_offset = tuple(offset + normal for offset, normal in zip(neighbor_offset, self.normal_direction))
-        mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(self.mirror_axis)
+        mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(self.mirror_axis, self.stencil)
         mirrored_direction = inv_dir[sp.IndexedBase(mirrored_stencil_symbol, shape=(1,))[dir_symbol]]
 
         name_base = "f_in_inv_offsets_"
@@ -696,7 +736,12 @@ class WallFunctionBounce(LbBoundary):
         if self.stencil.Q == 19:
             result.append(Assignment(weight, sp.Rational(1, 2)))
         elif self.stencil.Q == 27:
-            result.append(Assignment(inv_weight_sq, sum([neighbor_offset[i]**2 for i in self.tangential_axis])))
+            result.append(
+                Assignment(
+                    inv_weight_sq,
+                    sum([CastFunc(neighbor_offset[i], self.data_type)**2 for i in self.tangential_axis])
+                )
+            )
             a, b = sp.symbols("wfb_a wfb_b")
 
             if self.weight_method == self.WeightMethod.LATTICE_WEIGHT:
@@ -712,7 +757,12 @@ class WallFunctionBounce(LbBoundary):
                                                           (res_ab[b], True))))
 
         factor = self.dt / self.dy * weight
-        drag = sum([neighbor_offset[i] * factor * wall_stress[i] for i in self.tangential_axis])
+        drag = sum(
+            [
+                CastFunc(neighbor_offset[i], self.data_type) * factor * wall_stress[i]
+                for i in self.tangential_axis
+            ]
+        )
 
         result.append(Assignment(f_in.center(inv_dir[dir_symbol]), f_out[tangential_offset](mirrored_direction) - drag))
 
@@ -792,6 +842,7 @@ class UBB(LbBoundary):
         return callable(self._velocity)
 
     def __call__(self, f_out, f_in, dir_symbol, inv_dir, lb_method, index_field, force_vector):
+        dtype = create_type(self.data_type)
         vel_from_idx_field = callable(self._velocity)
         vel = [index_field(f'vel_{i}') for i in range(self.dim)] if vel_from_idx_field else self._velocity
 
@@ -814,8 +865,11 @@ class UBB(LbBoundary):
         c_s_sq = sp.Rational(1, 3)
         weight_info = LbmWeightInfo(lb_method, data_type=self.data_type)
         weight_of_direction = weight_info.weight_of_direction
-        vel_term = 2 / c_s_sq * sum([d_i * v_i for d_i, v_i in zip(neighbor_offset, velocity)]) * weight_of_direction(
-            dir_symbol, lb_method)
+        vel_term = (
+            2 / c_s_sq
+            * sum([CastFunc(d_i, dtype) * v_i for d_i, v_i in zip(neighbor_offset, velocity)]) 
+            * weight_of_direction(dir_symbol, lb_method)
+        )
 
         # Better alternative: in conserved value computation
         # rename what is currently called density to "virtual_density"

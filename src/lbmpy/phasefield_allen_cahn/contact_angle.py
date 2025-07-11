@@ -1,12 +1,17 @@
 import math
 import sympy as sp
 
+from .._compat import IS_PYSTENCILS_2
+
+if IS_PYSTENCILS_2:
+    raise ImportError("`lbmpy.phasefield_allen_cahn.contact_angle` is only available when running with pystencils 1.x")
+
 from pystencils.astnodes import Block, Conditional, SympyAssignment
 
 from pystencils.boundaries.boundaryhandling import BoundaryOffsetInfo
 from pystencils.boundaries.boundaryconditions import Boundary
 
-from pystencils.typing import TypedSymbol
+from pystencils import TypedSymbol
 from pystencils.typing import CastFunc
 
 

@@ -1,16 +1,23 @@
 import math
+import pytest
 
 import pystencils as ps
 from pystencils.boundaries.boundaryhandling import BoundaryHandling
 
 from lbmpy.enums import Stencil
-from lbmpy.phasefield_allen_cahn.contact_angle import ContactAngle
 from lbmpy.stencils import LBStencil
+from lbmpy._compat import IS_PYSTENCILS_2
 
 import numpy as np
 
 
+@pytest.mark.skipif(
+    IS_PYSTENCILS_2,
+    reason="Contact angle calculation not yet available with pystencils 2.0"
+)
 def test_contact_angle():
+    from lbmpy.phasefield_allen_cahn.contact_angle import ContactAngle
+
     stencil = LBStencil(Stencil.D2Q9)
     contact_angle = 45
     phase_value = 0.5

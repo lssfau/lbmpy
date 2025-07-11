@@ -3,7 +3,13 @@ from typing import Tuple
 import numpy as np
 import sympy as sp
 
-from lbmpy.custom_code_nodes import LbmWeightInfo
+from .._compat import IS_PYSTENCILS_2
+
+if IS_PYSTENCILS_2:
+    from lbmpy.lookup_tables import LbmWeightInfo
+else:
+    from lbmpy.custom_code_nodes import LbmWeightInfo
+
 from pystencils import Assignment, Field, TypedSymbol
 from pystencils.boundaries.boundaryhandling import BoundaryOffsetInfo
 from pystencils.boundaries.createindexlist import (
@@ -235,7 +241,17 @@ class SparseLbBoundaryMapper:
         return result
 
     def assignments(self):
-        return [BoundaryOffsetInfo(self.method.stencil),
+        if IS_PYSTENCILS_2:
+            return (
+                BoundaryOffsetInfo(self.method.stencil).get_array_declarations()
+                + LbmWeightInfo(self.method).get_array_declarations()
+                + [Assignment(self.DIR_SYMBOL, self.index_field(self.DIR_SYMBOL.name))]
+                + self.boundary_eqs
+            )
+        else:
+            return [
+                BoundaryOffsetInfo(self.method.stencil),
                 LbmWeightInfo(self.method),
                 Assignment(self.DIR_SYMBOL, self.index_field(self.DIR_SYMBOL.name)),
-                *self.boundary_eqs]
+                *self.boundary_eqs
+            ]

@@ -1,7 +1,6 @@
 import sympy as sp
 
-from pystencils.simp.assignment_collection import AssignmentCollection
-from pystencils import Assignment
+from pystencils import Assignment, AssignmentCollection
 
 from lbmpy.stencils import Stencil, LBStencil
 from lbmpy.moments import MOMENT_SYMBOLS, statistical_quantity_symbol

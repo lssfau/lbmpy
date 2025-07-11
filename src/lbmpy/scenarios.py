@@ -27,9 +27,11 @@ that defines the viscosity of the fluid (valid values being between 0 and 2).
 """
 import numpy as np
 
+from lbmpy._compat import IS_PYSTENCILS_2
 from lbmpy.boundaries import UBB, FixedDensity, NoSlip
 from lbmpy.geometry import add_pipe_inflow_boundary, add_pipe_walls
 from lbmpy.lbstep import LatticeBoltzmannStep
+from pystencils import Target
 from pystencils.datahandling import create_data_handling
 from pystencils.slicing import slice_from_direction
 
@@ -86,7 +88,7 @@ def create_lid_driven_cavity(domain_size=None, lid_velocity=0.005, lbm_kernel=No
     assert domain_size is not None or data_handling is not None
     if data_handling is None:
         optimization = kwargs.get('optimization', None)
-        target = optimization.get('target', None) if optimization else None
+        target = optimization.get('target', None) if optimization else Target.CPU
         data_handling = create_data_handling(domain_size,
                                              periodicity=False,
                                              default_ghost_layers=1,
@@ -94,7 +96,13 @@ def create_lid_driven_cavity(domain_size=None, lid_velocity=0.005, lbm_kernel=No
                                              default_target=target)
     step = LatticeBoltzmannStep(data_handling=data_handling, lbm_kernel=lbm_kernel, name="ldc", **kwargs)
 
-    my_ubb = UBB(velocity=[lid_velocity, 0, 0][:step.method.dim])
+    if IS_PYSTENCILS_2:
+        my_ubb = UBB(
+            velocity=[lid_velocity, 0, 0][:step.method.dim],
+            data_type=step.config.get_option("default_dtype")
+        )
+    else:  # legacy version does not set data type of boundary correctly
+        my_ubb = UBB(velocity=[lid_velocity, 0, 0][:step.method.dim])
     step.boundary_handling.set_boundary(my_ubb, slice_from_direction('N', step.dim))
     for direction in ('W', 'E', 'S') if step.dim == 2 else ('W', 'E', 'S', 'T', 'B'):
         step.boundary_handling.set_boundary(NoSlip(), slice_from_direction(direction, step.dim))

@@ -2,10 +2,17 @@ import numpy as np
 import sympy as sp
 import pystencils as ps
 
-from pystencils.typing import TypedSymbol, create_type
-from lbmpy.advanced_streaming.utility import get_accessor, inverse_dir_index, is_inplace, Timestep
-from lbmpy.custom_code_nodes import TranslationArraysNode
+from .._compat import IS_PYSTENCILS_2
 
+if IS_PYSTENCILS_2:
+    from pystencils import TypedSymbol, create_type
+    from pystencils.types.quick import Arr
+    from lbmpy.lookup_tables import TranslationArraysNode
+else:
+    from pystencils.typing import TypedSymbol, create_type
+    from ..custom_code_nodes import TranslationArraysNode
+
+from lbmpy.advanced_streaming.utility import get_accessor, inverse_dir_index, is_inplace, Timestep
 from itertools import product
 
 
@@ -64,13 +71,21 @@ class BetweenTimestepsIndexing:
         assert f_dir in ['in', 'out']
         inv = '_inv' if inverse else ''
         name = f"f_{f_dir}{inv}_dir_idx"
-        return TypedSymbol(name, self._index_dtype)
+        if IS_PYSTENCILS_2:
+            return TypedSymbol(name, Arr(self._index_dtype, self._q))
+        else:
+            return TypedSymbol(name, self._index_dtype)
 
     def _offset_array_symbols(self, f_dir, inverse):
         assert f_dir in ['in', 'out']
         inv = '_inv' if inverse else ''
         name_base = f"f_{f_dir}{inv}_offsets_"
-        symbols = [TypedSymbol(name_base + d, self._index_dtype) for d in self._coordinate_names]
+
+        if IS_PYSTENCILS_2:
+            symbols = [TypedSymbol(name_base + d, Arr(self._index_dtype, self._q)) for d in self._coordinate_names]
+        else:
+            symbols = [TypedSymbol(name_base + d, self._index_dtype) for d in self._coordinate_names]
+        
         return symbols
 
     def _array_symbols(self, f_dir, inverse, index):
@@ -169,15 +184,25 @@ class BetweenTimestepsIndexing:
             indices, offsets = self._get_translated_indices_and_offsets(f_dir, inv)
             index_array_symbol = self._index_array_symbol(f_dir, inv)
             symbols_defined.add(index_array_symbol)
-            array_content.append((self._index_dtype, index_array_symbol.name, indices))
+
+            if IS_PYSTENCILS_2:
+                array_content.append((index_array_symbol, indices))
+            else:
+                array_content.append((self._index_dtype, index_array_symbol.name, indices))
 
         for f_dir, inv in self._required_offset_arrays:
             indices, offsets = self._get_translated_indices_and_offsets(f_dir, inv)
             offset_array_symbols = self._offset_array_symbols(f_dir, inv)
             symbols_defined |= set(offset_array_symbols)
             for d, arrsymb in enumerate(offset_array_symbols):
-                array_content.append((self._offsets_dtype, arrsymb.name, offsets[d]))
+                if IS_PYSTENCILS_2:
+                    array_content.append((arrsymb, offsets[d]))
+                else:
+                    array_content.append((self._offsets_dtype, arrsymb.name, offsets[d]))
 
-        return TranslationArraysNode(array_content, symbols_defined)
+        if IS_PYSTENCILS_2:
+            return TranslationArraysNode(array_content)
+        else:
+            return TranslationArraysNode(array_content, symbols_defined)
 
 #   end class AdvancedStreamingIndexing

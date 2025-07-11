@@ -2,19 +2,23 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from pystencils import Backend, Target, CreateKernelConfig
+from pystencils import Target, CreateKernelConfig
 
 from lbmpy.creationfunctions import LBMConfig, LBMOptimisation
 from lbmpy.enums import Method, Stencil
 from lbmpy.scenarios import create_channel
 from lbmpy.stencils import LBStencil
+from lbmpy._compat import IS_PYSTENCILS_2
 
 
-def run_equivalence_test(domain_size, lbm_config, lbm_opt, config, time_steps=13):
-    config = replace(config, target=Target.CPU)
+def run_equivalence_test(domain_size, lbm_config, lbm_opt, base_config, time_steps=13):
+    config = replace(base_config, target=Target.CPU)
     cpu_scenario = create_channel(domain_size=domain_size, pressure_difference=0.001,
                                   lbm_config=lbm_config, lbm_optimisation=lbm_opt, config=config)
-    config = replace(config, target=Target.GPU, backend=Backend.CUDA)
+    config = replace(base_config, target=Target.GPU)
+    if not IS_PYSTENCILS_2:
+        from pystencils.enums import Backend
+        config = replace(config, backend=Backend.CUDA)
     gpu_scenario = create_channel(domain_size=domain_size, pressure_difference=0.001,
                                   lbm_config=lbm_config, lbm_optimisation=lbm_opt, config=config)
 
@@ -48,6 +52,10 @@ def test_force_driven_channel_short(scenario):
     if block_size is not False:
         config = CreateKernelConfig(gpu_indexing_params={'block_size': block_size})
     else:
-        config = CreateKernelConfig(gpu_indexing='line')
+        if IS_PYSTENCILS_2:
+            config = CreateKernelConfig()
+            config.gpu.indexing_scheme = "blockwise4d"
+        else:
+            config = CreateKernelConfig(gpu_indexing='line')
 
-    run_equivalence_test(domain_size=ds, lbm_config=lbm_config, lbm_opt=lbm_opt, config=config)
+    run_equivalence_test(domain_size=ds, lbm_config=lbm_config, lbm_opt=lbm_opt, base_config=config)

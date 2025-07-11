@@ -21,6 +21,9 @@ doc/bibtex.json
 /src/lbmpy/phasefield/simplex_projection.*.so
 /src/lbmpy/phasefield/simplex_projection.c
 
+test-report
+report.xml
+
 # macOS
 **/.DS_Store
 *.uuid
