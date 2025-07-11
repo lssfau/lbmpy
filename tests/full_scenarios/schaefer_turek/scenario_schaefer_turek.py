@@ -10,7 +10,9 @@ import warnings
 import numpy as np
 import pytest
 
-from pystencils.backends.simd_instruction_sets import get_supported_instruction_sets
+from pystencils import Target
+
+from lbmpy._compat import get_supported_instruction_sets
 from lbmpy.boundaries.boundaryconditions import NoSlip
 from lbmpy.geometry import get_pipe_velocity_field
 from lbmpy.relaxationrates import relaxation_rate_from_lattice_viscosity

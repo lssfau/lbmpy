@@ -1,5 +1,5 @@
 import sympy as sp
-from pystencils.simp.subexpression_insertion import insert_constants
+from pystencils.simp import insert_constants
 
 from lbmpy import create_lb_collision_rule, LBMConfig, LBStencil, Stencil, Method, SubgridScaleModel
 

@@ -4,7 +4,7 @@ from copy import deepcopy
 from lbmpy.simplificationfactory import create_simplification_strategy
 from pystencils import create_kernel, CreateKernelConfig, Assignment
 from pystencils.field import Field, get_layout_of_array
-from pystencils.enums import Target
+from pystencils import Target
 
 from lbmpy.advanced_streaming.utility import get_accessor, Timestep
 from lbmpy.relaxationrates import get_shear_relaxation_rate

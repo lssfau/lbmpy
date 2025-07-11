@@ -5,13 +5,18 @@ import runpy
 import sys
 import warnings
 import platform
+import pathlib
 
 import nbformat
-from nbconvert import PythonExporter
+import nbconvert
 import sympy
+
+from lbmpy._compat import IS_PYSTENCILS_2
+
 # Trigger config file reading / creation once - to avoid race conditions when multiple instances are creating it
 # at the same time
-from pystencils.cpu import cpujit
+if not IS_PYSTENCILS_2:
+    from pystencils.cpu import cpujit
 
 # trigger cython imports - there seems to be a problem when multiple processes try to compile the same cython file
 # at the same time
@@ -19,7 +24,6 @@ try:
     import pyximport
 
     pyximport.install(language_level=3)
-
     from lbmpy.phasefield.simplex_projection import simplex_projection_2d  # NOQA
 except ImportError:
     pass
@@ -44,6 +48,13 @@ def add_path_to_ignore(path):
 collect_ignore = [os.path.join(SCRIPT_FOLDER, "doc", "conf.py"),
                   os.path.join(SCRIPT_FOLDER, "doc", "img", "mb_discretization", "maxwell_boltzmann_stencil_plot.py")]
 add_path_to_ignore('_local_tmp')
+
+if IS_PYSTENCILS_2:
+    #   TODO: Fix these step-by-step
+    collect_ignore += [
+        os.path.join(SCRIPT_FOLDER, "doc", "notebooks", "10_tutorial_conservative_allen_cahn_two_phase.ipynb"),
+        os.path.join(SCRIPT_FOLDER, "tests", "test_compiled_in_boundaries.ipynb")
+    ]
 
 try:
     import cupy
@@ -129,7 +140,7 @@ class IPyNbTest(pytest.Item):
 
 class IPyNbFile(pytest.File):
     def collect(self):
-        exporter = PythonExporter()
+        exporter = nbconvert.PythonExporter()
         exporter.exclude_markdown = True
         exporter.exclude_input_prompt = True
 

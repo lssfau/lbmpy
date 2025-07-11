@@ -202,7 +202,7 @@ def test_optimised_and_full_communication_equivalence(stencil_name):
 
     lbm_config = LBMConfig(stencil=stencil, kernel_type="stream_pull_only")
     lbm_opt = LBMOptimisation(symbolic_field=pdf, symbolic_temporary_field=pdf_tmp)
-    config = ps.CreateKernelConfig(target=dh.default_target, cpu_openmp=True)
+    config = ps.CreateKernelConfig(target=dh.default_target, data_type=np.int64, cpu_openmp=True)
 
     ac = create_lb_update_rule(lbm_config=lbm_config, lbm_optimisation=lbm_opt)
     ast = ps.create_kernel(ac, config=config)

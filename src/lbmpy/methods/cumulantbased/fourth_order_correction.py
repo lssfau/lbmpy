@@ -3,8 +3,7 @@ import sympy as sp
 from lbmpy.moment_transforms import PRE_COLLISION_MONOMIAL_CUMULANT, POST_COLLISION_CUMULANT
 from lbmpy.moments import MOMENT_SYMBOLS, statistical_quantity_symbol
 from lbmpy.stencils import Stencil, LBStencil
-from pystencils import Assignment
-from pystencils.simp.assignment_collection import AssignmentCollection
+from pystencils import Assignment, AssignmentCollection
 from .cumulantbasedmethod import CumulantBasedLbMethod
 
 X, Y, Z = MOMENT_SYMBOLS

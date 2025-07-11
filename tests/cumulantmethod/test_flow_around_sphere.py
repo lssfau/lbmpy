@@ -61,7 +61,6 @@ def flow_around_sphere(stencil, galilean_correction, fourth_order_correction, L_
             boundary_assignments,
             config=CreateKernelConfig(
                 iteration_slice=iter_slice,
-                ghost_layers=1,
                 target=target,
                 skip_independence_check=True)
             )

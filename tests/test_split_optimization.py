@@ -5,6 +5,8 @@ from lbmpy.creationfunctions import create_lb_ast, LBMConfig, LBMOptimisation
 from lbmpy.enums import ForceModel, Method, Stencil
 from lbmpy.scenarios import create_lid_driven_cavity
 from lbmpy.stencils import LBStencil
+from lbmpy._compat import IS_PYSTENCILS_2
+
 from pystencils.sympyextensions import count_operations_in_ast
 from sympy.core.cache import clear_cache
 
@@ -12,6 +14,7 @@ from sympy.core.cache import clear_cache
 @pytest.mark.parametrize('stencil', [Stencil.D2Q9, Stencil.D3Q19])
 @pytest.mark.parametrize('compressible', [True, False])
 @pytest.mark.parametrize('method', [Method.SRT, Method.TRT])
+@pytest.mark.xfail(IS_PYSTENCILS_2, reason="Loop splitting is not available yet")
 def test_split_number_of_operations(stencil, compressible, method):
     # For the following configurations the number of operations for splitted and un-splitted version are
     # exactly equal. This is not true for D3Q15 and D3Q27 because some sub-expressions are computed in multiple
@@ -36,6 +39,7 @@ def test_split_number_of_operations(stencil, compressible, method):
 @pytest.mark.parametrize('method', [Method.SRT, Method.TRT])
 @pytest.mark.parametrize('force', [(0, 0, 0), (1e-6, 1e-7, 2e-6)])
 @pytest.mark.longrun
+@pytest.mark.xfail(IS_PYSTENCILS_2, reason="Loop splitting is not available yet")
 def test_equivalence(stencil, compressible, method, force):
     relaxation_rates = [1.8, 1.7, 1.0, 1.0, 1.0, 1.0]
     stencil = LBStencil(stencil)
@@ -57,6 +61,7 @@ def test_equivalence(stencil, compressible, method, force):
 
 
 @pytest.mark.parametrize('setup', [(Stencil.D2Q9, True, Method.SRT, 1e-7), (Stencil.D3Q19, False, Method.MRT, 0)])
+@pytest.mark.xfail(IS_PYSTENCILS_2, reason="Loop splitting is not available yet")
 def test_equivalence_short(setup):
     relaxation_rates = [1.8, 1.7, 1.0, 1.0, 1.0, 1.0]
     stencil = LBStencil(setup[0])

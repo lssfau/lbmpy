@@ -1,6 +1,6 @@
 from pystencils import Assignment, AssignmentCollection
 from pystencils.sympyextensions import scalar_product
-from pystencils.simp.subexpression_insertion import insert_constants
+from pystencils.simp import insert_constants
 
 from lbmpy.phasefield_allen_cahn.derivatives import isotropic_gradient_symbolic, laplacian_symbolic
 

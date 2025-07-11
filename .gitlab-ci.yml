@@ -1,64 +1,76 @@
 stages:
-  - pretest
-  - test
+  - "Code Quality"
+  - "Tests"
+  - "Prerelease-Tests"
+  - integration
   - nightly
   - docs
   - deploy
 
-# --------------------------  Templates ------------------------------------------------------------------------------------
-
-# Base configuration for jobs meant to run at every commit
-.every-commit:
-  rules:
-    - if: $CI_PIPELINE_SOURCE != "schedule"
-
-# Configuration for jobs meant to run on each commit to pycodegen/pystencils/master
-.every-commit-master:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PROJECT_PATH == "pycodegen/lbmpy" && $CI_COMMIT_BRANCH == "master"'
+# --------------------------  Code Quality --------------------------------------------------------------------------------
 
 
-# Base configuration for jobs meant to run at a schedule
-.scheduled:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-
-# --------------------------  Pre Tests --------------------------------------------------------------------------------
-
-# Normal test - runs on every commit all but "long run" tests
-tests-and-coverage:
-  stage: pretest
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full:cupy12.3
+# Linter for code formatting
+flake8-lint:
+  stage: "Code Quality"
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
   script:
-    # - pip install sympy --upgrade
-    - export NUM_CORES=$(nproc --all)
-    - mkdir -p ~/.config/matplotlib
-    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - mkdir public
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-    - env
-    - pip list
-    - py.test -v -n $NUM_CORES --cov-report html --cov-report xml --cov-report term --cov=. -m "not longrun" --junitxml=report.xml
-    - python3 -m coverage xml
+    - nox -s lint
   tags:
     - docker
-    - cuda11
+
+
+# --------------------------  Tests --------------------------------------------------------------------------------
+
+# Normal test - runs on every commit all but "long run" tests
+testsuite-cuda-py3.10:
+  stage: "Tests"
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:ubuntu24.04-cuda12.6
+  needs: []
+  script:
+    - mkdir -p ~/.config/matplotlib
+    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
+    - nox -s "testsuite_gpu-3.10(cupy12)"
+  tags:
+    - docker
+    - cuda
+    - cudaComputeCapability6.1
     - AVX
   coverage: /Total coverage:\s\d+.\d+\%/
   artifacts:
     when: always
     paths:
       - coverage_report
+      - test-report
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
       junit: report.xml
 
+
+testsuite-cpu-py3.13:
+  stage: "Tests"
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
+  needs: []
+  script:
+    - mkdir -p ~/.config/matplotlib
+    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
+    - nox -s "testsuite_cpu-3.13"
+  tags:
+    - docker
+    - AVX
+  artifacts:
+    when: always
+    paths:
+      - test-report
+    reports:
+      junit: report.xml
+
+
 # Normal test with longruns
 tests-and-coverage-with-longrun:
-  stage: test
+  stage: "Tests"
   when: manual
   allow_failure: true
   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
@@ -74,155 +86,88 @@ tests-and-coverage-with-longrun:
     - py.test -v -n $NUM_CORES
   tags:
     - docker
-    - cuda11
+    - cuda
+    - cudaComputeCapability6.1
     - AVX
 
-minimal-conda:
-  stage: pretest
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/minimal_conda
-  script:
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-    - pip install -e .
-    - python quicktest.py
-  tags:
-    - docker
+# --------------------------  Nightly and Pre-Release Tests --------------------------------------------------------------------------------
 
-# Linter for code formatting
-flake8-lint:
-  stage: pretest
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
+# Test against latest pystencils 2.0 development version
+pystencils-2.0dev:
+  stage: "Prerelease-Tests"
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:ubuntu24.04-cuda12.6
+  allow_failure: true
+  needs: []
   script:
-    - flake8 src/lbmpy
-  tags:
-    - docker
-    - cuda11
-
-# -------------------------- Tests -------------------------------------------------------------------------------------
-
-# pipeline with latest python version
-latest-python:
-  stage: test
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/latest_python
-  before_script:
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-  script:
-    - env
-    - pip list
-    - export NUM_CORES=$(nproc --all)
     - mkdir -p ~/.config/matplotlib
     - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - mkdir public
-    - py.test -v -n $NUM_CORES -m "not longrun" --junitxml=report.xml
+    - nox -s "testsuite_pystencils2(cupy12)"
   tags:
     - docker
     - AVX
+    - cuda
+    - cudaComputeCapability6.1
   artifacts:
     when: always
+    paths:
+      - test-report
     reports:
       junit: report.xml
-
-# Minimal tests in windows environment
-#minimal-windows:
-#  stage: test
-#  except:
-#    variables:
-#      - $ENABLE_NIGHTLY_BUILDS
-#  tags:
-#    - win
-#  script:
-#    - export NUM_CORES=$(nproc --all)
-#    - export MPLBACKEND=Agg
-#    - source /cygdrive/c/Users/build/Miniconda3/Scripts/activate
-#    - source activate pystencils
-#    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-#    - python -c "import numpy"
-#    - pip install sympy==1.9
-#    - py.test -v -m "not (notebook or longrun)"
 
 minimal-sympy-master:
-  stage: test
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/minimal_conda
-  before_script:
-    - pip install -e .
+  stage: "Prerelease-Tests"
+  needs: []
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
   script:
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-    - python -m pip install --upgrade git+https://github.com/sympy/sympy.git
-    - pip list
-    - python quicktest.py
+    - nox -s quicktest -P 3.13 -- --sympy-master
   allow_failure: true
   tags:
     - docker
-    - cuda
 
-ubuntu:
-  stage: test
-  extends: .every-commit
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/ubuntu
-  before_script:
-    # - apt-get -y remove python3-sympy
-    - ln -s /usr/include/locale.h /usr/include/xlocale.h
-    # - pip3 install `grep -Eo 'sympy[>=]+[0-9\.]+' setup.py | sed 's/>/=/g'`
-    - pip3 install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-  script:
-    - export NUM_CORES=$(nproc --all)
-    - mkdir -p ~/.config/matplotlib
-    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - env
-    - pip3 list
-    - pytest -v -n $NUM_CORES -m "not longrun" --junitxml=report.xml
-  tags:
-    - docker
-    - cuda11
-  artifacts:
-    when: always
-    reports:
-      junit: report.xml
+# pycodegen-integration:
+#   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
+#   stage: integration
+#   when: manual
+#   allow_failure: true
+#   script:
+#     - env
+#     - pip list
+#     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pycodegen.git
+#     - cd pycodegen
+#     - git submodule sync --recursive
+#     - git submodule update --init --recursive
+#     - git submodule foreach git fetch origin   # compare the latest master version!
+#     - git submodule foreach git reset --hard origin/master
+#     - cd lbmpy
+#     - git remote add test $CI_REPOSITORY_URL
+#     - git fetch test
+#     - git reset --hard $CI_COMMIT_SHA
+#     - cd ..
+#     - pip install -e pystencils/
+#     - pip install -e lbmpy/
+#     - ./install_walberla.sh
+#     # build all integration tests
+#     - cd walberla/build/
+#     - make -j $NUM_CORES MicroBenchmarkGpuLbm LbCodeGenerationExample
+#     - cd apps/benchmarks/UniformGridGPU
+#     - make -j $NUM_CORES
+#     - cd ../UniformGridCPU
+#     - make -j $NUM_CORES
 
-pycodegen-integration:
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
-  stage: test
-  when: manual
-  allow_failure: true
-  script:
-    - env
-    - pip list
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pycodegen.git
-    - cd pycodegen
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git submodule foreach git fetch origin   # compare the latest master version!
-    - git submodule foreach git reset --hard origin/master
-    - cd lbmpy
-    - git remote add test $CI_REPOSITORY_URL
-    - git fetch test
-    - git reset --hard $CI_COMMIT_SHA
-    - cd ..
-    - pip install -e pystencils/
-    - pip install -e lbmpy/
-    - ./install_walberla.sh
-    # build all integration tests
-    - cd walberla/build/
-    - make -j $NUM_CORES MicroBenchmarkGpuLbm LbCodeGenerationExample
-    - cd apps/benchmarks/UniformGridGPU
-    - make -j $NUM_CORES
-    - cd ../UniformGridCPU
-    - make -j $NUM_CORES
+#   tags:
+#     - docker
+#     - cuda
+#     - cudaComputeCapability6.1
+#     - AVX
 
-  tags:
-    - docker
-    - cuda11
-    - AVX
 
 # -------------------- Scheduled Tasks --------------------------------------------------------------------------
 
 
 nightly-sympy:
   stage: nightly
-  extends: .scheduled
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/latest_python
   before_script:
     - pip install -e .
@@ -240,6 +185,7 @@ nightly-sympy:
     - docker
     - AVX
     - cuda
+    - cudaComputeCapability6.1
   artifacts:
     when: always
     reports:
@@ -251,7 +197,6 @@ nightly-sympy:
 build-documentation:
   stage: docs
   needs: []
-  extends: .every-commit
   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/documentation
   before_script:
     - pip install -e .
@@ -262,7 +207,8 @@ build-documentation:
     - sphinx-build -W -b html doc html_doc
   tags:
     - docker
-    - cuda11
+    - cuda
+    - cudaComputeCapability6.1
   artifacts:
     paths:
       - html_doc
@@ -270,9 +216,10 @@ build-documentation:
 
 pages:
   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
-  extends: .every-commit-master
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PROJECT_PATH == "pycodegen/lbmpy" && $CI_COMMIT_BRANCH == "master"'
   stage: deploy
-  needs: ["tests-and-coverage", "build-documentation"]
+  needs: ["testsuite-cuda-py3.10", "build-documentation"]
   script:
     - ls -l
     - mv coverage_report html_doc

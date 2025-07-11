@@ -1,7 +1,7 @@
 from functools import partial
 
 import pystencils as ps
-from pystencils.astnodes import LoopOverCoordinate
+from lbmpy._compat import get_loop_counter_symbol
 from pystencils.slicing import get_periodic_boundary_functor
 
 from lbmpy.creationfunctions import create_lb_update_rule, LBMConfig, LBMOptimisation
@@ -76,7 +76,7 @@ def test_lees_edwards():
     u = dh.add_array('u', values_per_cell=stencil.D)
     dh.fill('u', 0.0, ghost_layers=True)
 
-    counters = [LoopOverCoordinate.get_loop_counter_symbol(i) for i in range(stencil.D)]
+    counters = [get_loop_counter_symbol(i) for i in range(stencil.D)]
     points_up = sp.Symbol('points_up')
     points_down = sp.Symbol('points_down')
 

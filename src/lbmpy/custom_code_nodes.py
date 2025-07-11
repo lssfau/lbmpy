@@ -1,6 +1,11 @@
 import numpy as np
 import sympy as sp
 
+from ._compat import IS_PYSTENCILS_2
+
+if IS_PYSTENCILS_2:
+    raise ImportError("`lbmpy.custom_code_nodes` is only available when running with pystencils 1.x")
+
 from pystencils.typing import TypedSymbol, create_type
 from pystencils.backends.cbackend import CustomCodeNode
 
@@ -44,14 +49,14 @@ class MirroredStencilDirections(CustomCodeNode):
         return tuple(direction)
 
     @staticmethod
-    def _mirrored_symbol(mirror_axis):
+    def _mirrored_symbol(mirror_axis, _stencil):
         axis = ['x', 'y', 'z']
         return TypedSymbol(f"{axis[mirror_axis]}_axis_mirrored_stencil_dir", create_type('int32'))
 
     def __init__(self, stencil, mirror_axis, dtype=np.int32):
         offsets_dtype = create_type(dtype)
 
-        mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(mirror_axis)
+        mirrored_stencil_symbol = MirroredStencilDirections._mirrored_symbol(mirror_axis, stencil)
         mirrored_directions = [stencil.index(MirroredStencilDirections.mirror_stencil(direction, mirror_axis))
                                for direction in stencil]
         code = "\n"

@@ -15,6 +15,8 @@ from pystencils import create_data_handling, make_slice, Target, CreateKernelCon
 from pystencils.slicing import slice_from_direction
 from pystencils.stencil import inverse_direction
 
+from lbmpy._compat import IS_PYSTENCILS_2
+
 
 def mirror_stencil(direction, mirror_axis):
     for i, n in enumerate(mirror_axis):
@@ -448,8 +450,17 @@ def test_force_on_boundary(given_force_vector, dtype):
     method = create_lb_method(lbm_config=LBMConfig(stencil=stencil, method=Method.SRT, relaxation_rate=1.8))
 
     noslip = NoSlip(name="noslip", calculate_force_on_boundary=True)
-    bouzidi = NoSlipLinearBouzidi(name="bouzidi", calculate_force_on_boundary=True)
-    qq_bounce_Back = QuadraticBounceBack(name="qqBB", relaxation_rate=1.8, calculate_force_on_boundary=True)
+    bouzidi = NoSlipLinearBouzidi(
+        name="bouzidi",
+        data_type=dtype,
+        calculate_force_on_boundary=True
+    )
+    qq_bounce_Back = QuadraticBounceBack(
+        name="qqBB",
+        relaxation_rate=1.8,
+        data_type=dtype,
+        calculate_force_on_boundary=True
+    )
 
     boundary_objects = [noslip, bouzidi, qq_bounce_Back]
     for boundary in boundary_objects:
@@ -465,7 +476,14 @@ def test_force_on_boundary(given_force_vector, dtype):
         index_field = ps.Field('indexVector', ps.FieldType.INDEXED, index_struct_dtype, layout=[0],
                                shape=(ps.TypedSymbol("indexVectorSize", "int32"), 1), strides=(1, 1))
 
-        create_lattice_boltzmann_boundary_kernel(pdfs, index_field, method, boundary, force_vector=force_vector)
+        create_lattice_boltzmann_boundary_kernel(
+            pdfs,
+            index_field,
+            method,
+            boundary,
+            force_vector=force_vector,
+            **({"default_dtype": dtype} if IS_PYSTENCILS_2 else dict())
+        )
 
 
 def _numpy_data_type_for_boundary_object(boundary_object, dim):

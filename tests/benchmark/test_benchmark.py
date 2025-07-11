@@ -2,9 +2,16 @@ from statistics import median
 
 import numpy as np
 import sympy as sp
+import pytest
 
 from lbmpy.scenarios import create_lid_driven_cavity
-from pystencils.cpu.cpujit import add_or_change_compiler_flags
+from lbmpy._compat import IS_PYSTENCILS_2
+
+if IS_PYSTENCILS_2:
+    pytest.skip(reason="Benchmark test case needs to be rebuilt for pystencils 2.0", allow_module_level=True)
+else:
+    from pystencils.cpu.cpujit import add_or_change_compiler_flags
+
 from pystencils.runhelper import ParameterStudy
 
 
