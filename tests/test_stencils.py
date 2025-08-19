@@ -99,9 +99,9 @@ def test_comparability_of_stencils():
     stencil_1 = LBStencil(Stencil.D2Q9)
     stencil_2 = LBStencil(Stencil.D2Q9)
     stencil_3 = LBStencil(Stencil.D2Q9, ordering="braunschweig")
-    stencil_4 = LBStencil(stencil_1.stencil_entries)
-    stencil_5 = LBStencil(stencil_3.stencil_entries)
-    stencil_6 = LBStencil(stencil_1.stencil_entries)
+    stencil_4 = LBStencil(stencil_1.stencil_entries, theta0=stencil_1.theta0)
+    stencil_5 = LBStencil(stencil_3.stencil_entries, theta0=stencil_3.theta0)
+    stencil_6 = LBStencil(stencil_1.stencil_entries, theta0=stencil_1.theta0)
 
     assert stencil_1 == stencil_2
     assert stencil_1 != stencil_3
