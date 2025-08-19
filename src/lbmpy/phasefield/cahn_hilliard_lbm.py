@@ -20,7 +20,7 @@ def cahn_hilliard_lb_method(stencil, mu, relaxation_rate=sp.Symbol("omega"), gam
         relaxation_rate: relaxation rate of method
         gamma: tunable parameter affecting the second order equilibrium moment
     """
-    weights = get_weights(stencil, c_s_sq=sp.Rational(1, 3))
+    weights = get_weights(stencil)
 
     kd = kronecker_delta
 

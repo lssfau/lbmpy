@@ -28,7 +28,7 @@ def test_shan_chen_two_component():
     rho0 = 1.
 
     stencil = lbmpy.LBStencil(Stencil.D2Q9)
-    weights = get_weights(stencil, c_s_sq=sp.Rational(1, 3))
+    weights = get_weights(stencil)
 
     dim = stencil.D
     dh = ps.create_data_handling((N,) * dim, periodicity=True, default_target=ps.Target.CPU)

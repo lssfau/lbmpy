@@ -492,7 +492,7 @@ def create_mrt_orthogonal(stencil, relaxation_rates, continuous_equilibrium=True
     check_and_set_mrt_space(CollisionSpace.RAW_MOMENTS)
 
     if weighted:
-        weights = get_weights(stencil, sp.Rational(1, 3))
+        weights = get_weights(stencil)
     else:
         weights = None
 

@@ -22,7 +22,7 @@ def test_shan_chen_two_phase():
     rho0 = 1.
 
     stencil = lbmpy.LBStencil(Stencil.D2Q9)
-    weights = get_weights(stencil, c_s_sq=sp.Rational(1, 3))
+    weights = get_weights(stencil)
 
     dh = ps.create_data_handling((N, ) * stencil.D, periodicity=True, default_target=ps.Target.CPU)
 

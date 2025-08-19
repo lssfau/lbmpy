@@ -22,7 +22,7 @@ import numpy as np
 def test_diffusion_boundary():
     domain_size = (10, 10)
     stencil = LBStencil(Stencil.D2Q9)
-    weights = get_weights(stencil, c_s_sq=sp.Rational(1, 3))
+    weights = get_weights(stencil)
     concentration = 1.0
 
     # Data Handling
