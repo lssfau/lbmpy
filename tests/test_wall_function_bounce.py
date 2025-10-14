@@ -3,7 +3,7 @@ import pytest
 import pystencils as ps
 from lbmpy import Stencil, LBStencil, LBMConfig, Method, lattice_viscosity_from_relaxation_rate, \
     LatticeBoltzmannStep, pdf_initialization_assignments, ForceModel
-from lbmpy.boundaries.boundaryconditions import UBB, WallFunctionBounce, NoSlip, FreeSlip
+from lbmpy.boundaries.boundaryconditions import WallFunctionBounce, NoSlip, FreeSlip
 from lbmpy.boundaries.wall_function_models import SpaldingsLaw, LogLaw, MoninObukhovSimilarityTheory, MuskerLaw
 from pystencils.slicing import slice_from_direction
 
@@ -68,40 +68,51 @@ def test_wfb(stencil, wfb_type):
 
     lb_step_wfb.data_handling.run_kernel(kernel_init)
 
-    # potential mean velocity field
-
-    mean_vel_field = lb_step_wfb.data_handling.fields[lb_step_wfb.velocity_data_name]
-    # mean_vel_field = lb_step_wfb.data_handling.add_array('mean_velocity_field', values_per_cell=stencil.D)
-    # lb_step_wfb.data_handling.fill('mean_velocity_field', 0.005, value_idx=0, ghost_layers=True)
     lb_step_wfb.data_handling.fill(lb_step_wfb.velocity_data_name, 0.025, value_idx=0, ghost_layers=True)
+
+    def ref_vel_callback(boundary_data, **_):
+        for cell in boundary_data.index_array:
+            cell['ref_vel_0'] = 0.025
+            cell['ref_vel_2'] = 0.0
+
+    def ref_vel_callback_maronga(boundary_data, **kwargs):
+        ref_vel_callback(boundary_data, **kwargs)
+        for cell in boundary_data.index_array:
+            cell['ref_vel_0_first_cell'] = 0.025
+            cell['ref_vel_2_first_cell'] = 0.0
 
     # wfb arguments
     wfb_args = {
         'wfb_i': {'wall_function_model': SpaldingsLaw(viscosity=nu),
                   'weight_method': WallFunctionBounce.WeightMethod.GEOMETRIC_WEIGHT,
+                  'reference_velocity': WallFunctionBounce.ReferenceVelocity.INSTANTANEOUS_VELOCITY,
                   'name': "wall"},
         'wfb_ii': {'wall_function_model': MuskerLaw(viscosity=nu),
                    'weight_method': WallFunctionBounce.WeightMethod.GEOMETRIC_WEIGHT,
-                   'mean_velocity': mean_vel_field,
+                   'reference_velocity': WallFunctionBounce.ReferenceVelocity.MEAN_VELOCITY,
+                   'reference_velocity_callback': ref_vel_callback,
                    'name': "wall"},
         'wfb_iii': {'wall_function_model': LogLaw(viscosity=nu),
                     'weight_method': WallFunctionBounce.WeightMethod.LATTICE_WEIGHT,
-                    'mean_velocity': mean_vel_field.center,
+                    'reference_velocity': WallFunctionBounce.ReferenceVelocity.INSTANTANEOUS_VELOCITY,
                     'sampling_shift': 2},
         'wfb_iv': {'wall_function_model': MoninObukhovSimilarityTheory(z0=1e-2),
                    'weight_method': WallFunctionBounce.WeightMethod.LATTICE_WEIGHT,
-                   'mean_velocity': mean_vel_field,
-                   'maronga_sampling_shift': 2}
+                   'reference_velocity': WallFunctionBounce.ReferenceVelocity.FILTERED_VELOCITY,
+                   'filter_width': 1e-5,
+                   'reference_velocity_callback': ref_vel_callback_maronga,
+                   'sampling_shift': 2,
+                   'use_maronga_correction': True}
     }
 
     wall = WallFunctionBounce(lb_method=lb_step_wfb.method, normal_direction=normal,
-                              pdfs=lb_step_wfb.data_handling.fields[lb_step_wfb._pdf_arr_name],
+                              velocity_field=lb_step_wfb.data_handling.fields[lb_step_wfb.velocity_data_name],
                               **wfb_args[wfb_type])
 
     lb_step_wfb.boundary_handling.set_boundary(wall, slice_from_direction('S', dim))
     lb_step_wfb.boundary_handling.set_boundary(wall_north, slice_from_direction('N', dim))
 
-    # rum cases
+    # run cases
 
     timesteps = 4000
     lb_step_noslip.run(timesteps)
