@@ -74,7 +74,7 @@ def welford_assignments(field, mean_field, sum_of_squares_field=None, sum_of_cub
             (f"Sum of cubes field does not have the right layout. "
              f"Index dimension: {welford_sum_of_cubes_field.field.values_per_cell()}, expected: {dim ** 3}")
 
-    # for the calculation of the thrid-order moments, the variance must also be calculated
+    # for the calculation of the third-order moments, the variance must also be calculated
     if welford_sum_of_cubes_field is not None:
         assert welford_sum_of_squares_field is not None
 
