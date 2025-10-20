@@ -40,7 +40,7 @@ testsuite-cuda-py3.10:
   artifacts:
     when: always
     paths:
-      - coverage_report
+      - htmlcov
       - test-report
     reports:
       coverage_report:
@@ -222,7 +222,7 @@ pages:
   needs: ["testsuite-cuda-py3.10", "build-documentation"]
   script:
     - ls -l
-    - mv coverage_report html_doc
+    - mv htmlcov html_doc/.
     - mv html_doc public  # folder has to be named "public" for gitlab to publish it
   artifacts:
     paths:
