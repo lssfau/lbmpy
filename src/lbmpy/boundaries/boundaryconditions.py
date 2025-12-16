@@ -833,11 +833,13 @@ class UBB(LbBoundary):
         adapt_velocity_to_force: adapts the velocity to the correct equilibrium when the lattice Boltzmann method holds
                                  a forcing term. If no forcing term is set and adapt_velocity_to_force is set to True
                                  it has no effect.
+        calculate_force_on_boundary: stores the force for each PDF at the boundary in a force vector
         dim: number of spatial dimensions
         name: optional name of the boundary.
     """
 
-    def __init__(self, velocity, density=None, adapt_velocity_to_force=False, dim=None, name=None, data_type='double'):
+    def __init__(self, velocity, density=None, adapt_velocity_to_force=False, dim=None, name=None, data_type='double',
+                 calculate_force_on_boundary=False):
         self._velocity = velocity
         self._density = density
         self._adaptVelocityToForce = adapt_velocity_to_force
@@ -848,7 +850,7 @@ class UBB(LbBoundary):
         self.dim = dim
         self.data_type = data_type
 
-        super(UBB, self).__init__(name, calculate_force_on_boundary=False)
+        super(UBB, self).__init__(name, calculate_force_on_boundary)
 
     @property
     def additional_data(self):
@@ -929,10 +931,24 @@ class UBB(LbBoundary):
                 result = density_equations.all_assignments
             result += [Assignment(f_in(inv_dir[dir_symbol]),
                                   f_out(dir_symbol) - vel_term * density_symbol)]
-            return result
         else:
-            return [Assignment(f_in(inv_dir[dir_symbol]),
-                               f_out(dir_symbol) - vel_term)]
+            result = [Assignment(f_in(inv_dir[dir_symbol]),
+                                 f_out(dir_symbol) - vel_term)]
+
+        if self.calculate_force_on_boundary:
+            force = sp.Symbol("f")
+            if lb_method.conserved_quantity_computation.compressible:
+                extra_expr = Assignment(force, sp.Float(2.0) * f_out(dir_symbol) - vel_term * density_symbol)
+            else:
+                extra_expr = Assignment(force, sp.Float(2.0) * f_out(dir_symbol) - vel_term)
+            offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
+            if IS_PYSTENCILS_2:
+                offset = [CastFunc.as_numeric(o) for o in offset]
+            result.append(extra_expr)
+            for i in range(lb_method.stencil.D):
+                result.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
+
+        return result
 
 
 # end class UBB
