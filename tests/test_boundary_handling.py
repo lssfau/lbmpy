@@ -461,8 +461,13 @@ def test_force_on_boundary(given_force_vector, dtype):
         data_type=dtype,
         calculate_force_on_boundary=True
     )
-
-    boundary_objects = [noslip, bouzidi, qq_bounce_Back]
+    ubb = UBB(
+        name="UBB",
+        velocity=[0.1, 0.2],
+        data_type=dtype,
+        calculate_force_on_boundary=True
+    )
+    boundary_objects = [noslip, bouzidi, qq_bounce_Back, ubb]
     for boundary in boundary_objects:
         if given_force_vector:
             force_vector_type = np.dtype([(f"F_{i}", dtype) for i in range(stencil.D)], align=True)
