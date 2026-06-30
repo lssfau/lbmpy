@@ -1,118 +1,92 @@
 stages:
   - "Code Quality"
-  - "Tests"
+  - "Unit Tests"
+  - "Reporting"
   - "Prerelease-Tests"
   - integration
   - nightly
   - docs
   - deploy
 
-# --------------------------  Code Quality --------------------------------------------------------------------------------
+# -------------------- Code Quality ---------------------------------------------------------------------
 
-
-# Linter for code formatting
-flake8-lint:
+.qa-base:
   stage: "Code Quality"
   image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
-  script:
-    - nox -s lint
+  needs: []
+  except:
+    variables:
+      - $ENABLE_NIGHTLY_BUILDS
   tags:
     - docker
+
+lint:
+  extends: .qa-base
+  script:
+    - nox -s lint
 
 
 # --------------------------  Tests --------------------------------------------------------------------------------
 
-# Normal test - runs on every commit all but "long run" tests
-testsuite-cuda-py3.10:
-  stage: "Tests"
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:ubuntu24.04-cuda12.6
+.testsuite-base:
+  stage: "Unit Tests"
   needs: []
-  script:
+  before_script:
     - mkdir -p ~/.config/matplotlib
     - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - nox -s "testsuite_gpu-3.10(cupy12)"
+  after_script:
+    - mv .coverage .coverage.${CI_JOB_ID}
+  artifacts:
+    when: always
+    paths:
+      - .coverage.*
+      - test-report
+    reports:
+      junit: report.xml
+
+testsuite-cuda-py3.10:
+  extends: .testsuite-base
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:ubuntu24.04-cuda12.6
+  script:
+    - nox -s "testsuite-3.10(cupy)"
   tags:
     - docker
     - cuda
     - cudaComputeCapability6.1
     - AVX
-  coverage: /Total coverage:\s\d+.\d+\%/
+
+
+testsuite-cpu-py3.13:
+  extends: .testsuite-base
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
+  script:
+    - nox -s "testsuite-3.13(cpu)"
+  tags:
+    - docker
+    - AVX
+
+
+# -------------------- Reporting -------------------------------------------------------------------------
+
+coverage-report:
+  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
+  stage: "Reporting"
+  script:
+    - nox -s "coverage_report"
+  coverage: /TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  tags:
+    - docker
   artifacts:
     when: always
     paths:
-      - htmlcov
-      - test-report
+      - coverage_report
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
-      junit: report.xml
 
-
-testsuite-cpu-py3.13:
-  stage: "Tests"
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:alpine
-  needs: []
-  script:
-    - mkdir -p ~/.config/matplotlib
-    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - nox -s "testsuite_cpu-3.13"
-  tags:
-    - docker
-    - AVX
-  artifacts:
-    when: always
-    paths:
-      - test-report
-    reports:
-      junit: report.xml
-
-
-# Normal test with longruns
-tests-and-coverage-with-longrun:
-  stage: "Tests"
-  when: manual
-  allow_failure: true
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/full
-  script:
-    # - pip install sympy --upgrade
-    - export NUM_CORES=$(nproc --all)
-    - mkdir -p ~/.config/matplotlib
-    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - mkdir public
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
-    - env
-    - pip list
-    - py.test -v -n $NUM_CORES
-  tags:
-    - docker
-    - cuda
-    - cudaComputeCapability6.1
-    - AVX
 
 # --------------------------  Nightly and Pre-Release Tests --------------------------------------------------------------------------------
-
-# Test against latest pystencils 2.0 development version
-pystencils-2.0dev:
-  stage: "Prerelease-Tests"
-  image: i10git.cs.fau.de:5005/pycodegen/pycodegen/nox:ubuntu24.04-cuda12.6
-  allow_failure: true
-  needs: []
-  script:
-    - mkdir -p ~/.config/matplotlib
-    - echo "backend:template" > ~/.config/matplotlib/matplotlibrc
-    - nox -s "testsuite_pystencils2(cupy12)"
-  tags:
-    - docker
-    - AVX
-    - cuda
-    - cudaComputeCapability6.1
-  artifacts:
-    when: always
-    paths:
-      - test-report
-    reports:
-      junit: report.xml
 
 minimal-sympy-master:
   stage: "Prerelease-Tests"

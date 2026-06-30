@@ -1,6 +1,11 @@
 lbmpy
 =====
 
+> [!note]
+> This is the code of lbmpy version 1.4.
+> This version of lbmpy is no longer being developed, and receives only basic support.
+> Please switch to lbmpy 2.0 instead, which is hosted by the `master` branch of https://i10git.cs.fau.de/pycodegen/lbmpy.
+
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mabau/lbmpy/master?filepath=doc%2Fnotebooks)
 [![Docs](https://img.shields.io/badge/read-the_docs-brightgreen.svg)](http://pycodegen.pages.i10git.cs.fau.de/lbmpy)
 [![pipeline status](https://i10git.cs.fau.de/pycodegen/lbmpy/badges/master/pipeline.svg)](https://i10git.cs.fau.de/pycodegen/lbmpy/commits/master)
