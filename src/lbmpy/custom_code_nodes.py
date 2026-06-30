@@ -1,11 +1,6 @@
 import numpy as np
 import sympy as sp
 
-from ._compat import IS_PYSTENCILS_2
-
-if IS_PYSTENCILS_2:
-    raise ImportError("`lbmpy.custom_code_nodes` is only available when running with pystencils 1.x")
-
 from pystencils.typing import TypedSymbol, create_type
 from pystencils.backends.cbackend import CustomCodeNode
 

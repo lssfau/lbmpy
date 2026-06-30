@@ -1,12 +1,10 @@
 from lbmpy.creationfunctions import create_lb_ast, LBMConfig
 from lbmpy.enums import Method, Stencil
 from lbmpy.stencils import LBStencil
-from lbmpy._compat import IS_PYSTENCILS_2
 import pytest
 from pystencils import Target, CreateKernelConfig
 
 
-@pytest.mark.xfail(IS_PYSTENCILS_2, reason="GPU block size limiting by registers is not available yet")
 def test_gpu_block_size_limiting():    
     pytest.importorskip("cupy")
     too_large = 2048*2048

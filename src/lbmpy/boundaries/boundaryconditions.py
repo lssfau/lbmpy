@@ -13,26 +13,13 @@ from lbmpy.simplificationfactory import create_simplification_strategy
 import sympy as sp
 import numpy as np
 
-from .._compat import IS_PYSTENCILS_2
-
-if IS_PYSTENCILS_2:
-    from pystencils import create_type
-    from pystencils.sympyextensions.typed_sympy import CastFunc
-    from pystencils.types.quick import Arr
-    from lbmpy.lookup_tables import (
-        NeighbourOffsetArrays,
-        MirroredStencilDirections,
-        LbmWeightInfo,
-        TranslationArraysNode
-    )
-else:
-    from pystencils.typing import create_type, CastFunc
-    from lbmpy.custom_code_nodes import (
-        NeighbourOffsetArrays,
-        MirroredStencilDirections,
-        LbmWeightInfo,
-        TranslationArraysNode
-    )
+from pystencils.typing import create_type, CastFunc
+from lbmpy.custom_code_nodes import (
+    NeighbourOffsetArrays,
+    MirroredStencilDirections,
+    LbmWeightInfo,
+    TranslationArraysNode
+)
 
 
 class LbBoundary(abc.ABC):
@@ -147,8 +134,6 @@ class NoSlip(LbBoundary):
             force = sp.Symbol("f")
             subexpressions = [Assignment(force, sp.Float(2.0) * f_out(dir_symbol))]
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            if IS_PYSTENCILS_2:
-                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
         else:
@@ -230,8 +215,6 @@ class NoSlipLinearBouzidi(LbBoundary):
             force = sp.Symbol("f")
             subexpressions.append(Assignment(force, f_xf + rhs))
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            if IS_PYSTENCILS_2:
-                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
 
@@ -264,10 +247,7 @@ class QuadraticBounceBack(LbBoundary):
         super(QuadraticBounceBack, self).__init__(name, calculate_force_on_boundary)
 
     def inv_dir_symbol(self, stencil):
-        if IS_PYSTENCILS_2:
-            return TypedSymbol("inv_dir", Arr(create_type("int32"), stencil.Q))
-        else:
-            return TypedSymbol("inv_dir", create_type("int32"))
+        return TypedSymbol("inv_dir", create_type("int32"))
 
     @property
     def additional_data(self):
@@ -300,13 +280,10 @@ class QuadraticBounceBack(LbBoundary):
         stencil = lb_method.stencil
         inv_directions = [str(stencil.index(inverse_direction(direction))) for direction in stencil]
 
-        if IS_PYSTENCILS_2:
-            inverse_dir_node = TranslationArraysNode([(self.inv_dir_symbol(stencil), inv_directions), ])
-        else:
-            inv_dir_symbol = self.inv_dir_symbol(stencil)
-            dtype = inv_dir_symbol.dtype
-            name = inv_dir_symbol.name
-            inverse_dir_node = TranslationArraysNode([(dtype, name, inv_directions), ], {inv_dir_symbol})
+        inv_dir_symbol = self.inv_dir_symbol(stencil)
+        dtype = inv_dir_symbol.dtype
+        name = inv_dir_symbol.name
+        inverse_dir_node = TranslationArraysNode([(dtype, name, inv_directions), ], {inv_dir_symbol})
 
         return [LbmWeightInfo(lb_method, self.data_type), inverse_dir_node, NeighbourOffsetArrays(lb_method.stencil)]
 
@@ -349,19 +326,13 @@ class QuadraticBounceBack(LbBoundary):
         subexpressions.append(Assignment(weight, weight_of_direction(dir_symbol, lb_method)))
         subexpressions.append(Assignment(weight_inv, weight_of_direction(inv, lb_method)))
 
-        if IS_PYSTENCILS_2:
-            cast_offset = CastFunc.as_numeric
-        else:
-            def cast_offset(x):
-                return x
-
         for i in range(lb_method.stencil.D):
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            subexpressions.append(Assignment(v[i], cast_offset(offset[i])))
+            subexpressions.append(Assignment(v[i], offset[i]))
 
         for i in range(lb_method.stencil.D):
             offset = NeighbourOffsetArrays.neighbour_offset(inv, lb_method.stencil)
-            subexpressions.append(Assignment(v_inv[i], cast_offset(offset[i])))
+            subexpressions.append(Assignment(v_inv[i], offset[i]))
 
         cqc = lb_method.conserved_quantity_computation
         rho = cqc.density_symbol
@@ -386,8 +357,6 @@ class QuadraticBounceBack(LbBoundary):
             force = sp.Symbol("f")
             subexpressions.append(Assignment(force, f_xf + result))
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            if IS_PYSTENCILS_2:
-                offset = [CastFunc.as_numeric(o) for o in offset]
             for i in range(lb_method.stencil.D):
                 subexpressions.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))
 
@@ -942,8 +911,6 @@ class UBB(LbBoundary):
             else:
                 extra_expr = Assignment(force, sp.Float(2.0) * f_out(dir_symbol) - vel_term)
             offset = NeighbourOffsetArrays.neighbour_offset(dir_symbol, lb_method.stencil)
-            if IS_PYSTENCILS_2:
-                offset = [CastFunc.as_numeric(o) for o in offset]
             result.append(extra_expr)
             for i in range(lb_method.stencil.D):
                 result.append(Assignment(force_vector[0](f'F_{i}'), force * offset[i]))

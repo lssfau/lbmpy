@@ -3,9 +3,6 @@
 to generate a fluctuating LBM the equilibrium moment values have to be scaled and an additive (random)
 correction term is added to the collision rule
 """
-from typing import overload
-
-from ._compat import IS_PYSTENCILS_2
 
 import numpy as np
 import sympy as sp
@@ -15,37 +12,12 @@ from lbmpy.equilibrium import ContinuousHydrodynamicMaxwellian
 from pystencils import Assignment, TypedSymbol
 from pystencils.simp.assignment_collection import SymbolGen
 
-if IS_PYSTENCILS_2:
-    from pystencils.sympyextensions.random import RngBase, Philox
-    from pystencils.sympyextensions import tcast
-else:
-    from pystencils.rng import PhiloxFourFloats, random_symbol
-
-
-@overload
-def add_fluctuations_to_collision_rule(collision_rule, temperature=None, amplitudes=(),
-                                       *,
-                                       block_offsets, seed, rng_node, c_s_sq):
-    """Fluctuating LB implementation for pystencils 1.3"""
-
-
-@overload
-def add_fluctuations_to_collision_rule(collision_rule, temperature=None, amplitudes=(),
-                                       *,
-                                       rng: 'RngBase | None' = None, c_s_sq):
-    """Fluctuating LB implementation for pystencils 2.0
-    
-    Args:
-        collision_rule: The base collision rule
-        temperature: Expression representing the fluid temperature
-        amplitudes: If ``temperature`` was not specified, expression representing the fluctuation amplitude
-        rng: Random number generator instance used to compute the fluctuations.
-            If `None`, the float32 Philox RNG will be used.
-    """
+from pystencils.rng import PhiloxFourFloats, random_symbol
 
 
 def add_fluctuations_to_collision_rule(collision_rule, temperature=None, amplitudes=(),
-                                       c_s_sq=sp.Rational(1, 3), **kwargs):
+                                       block_offsets=(0, 0, 0), seed=TypedSymbol("seed", np.uint32), 
+                                       rng_node=PhiloxFourFloats, c_s_sq=sp.Rational(1, 3)):
     if not (temperature and not amplitudes) or (temperature and amplitudes):
         raise ValueError("Fluctuating LBM: Pass either 'temperature' or 'amplitudes'.")
     
@@ -56,30 +28,13 @@ def add_fluctuations_to_collision_rule(collision_rule, temperature=None, amplitu
     if not method.is_weighted_orthogonal:
         raise ValueError("Fluctuations can only be added to weighted-orthogonal methods")
 
-    if IS_PYSTENCILS_2:
-        rng: RngBase = kwargs.get("rng", Philox("fluctuation_rng", np.float32, TypedSymbol("seed", np.uint32)))
-        ts = TypedSymbol("time_step", np.uint32)
+    if block_offsets == 'walberla':
+        block_offsets = tuple(TypedSymbol("block_offset_{}".format(i), np.uint32) for i in range(3))
 
-        def _rng_symbol_gen():
-            while True:
-                rx, rasm = rng.get_random_vector(ts)
-                collision_rule.subexpressions.insert(0, rasm)
-                for i in range(rng.vector_size):
-                    yield tcast.as_numeric(rx[i])
-
-        rng_symbol_gen = _rng_symbol_gen()
-    else:
-        block_offsets = kwargs.get("block_offsets", (0, 0, 0))
-        rng_node = kwargs.get("rng_node", PhiloxFourFloats)
-        seed = kwargs.get("seed", TypedSymbol("seed", np.uint32))
-
-        if block_offsets == 'walberla':
-            block_offsets = tuple(TypedSymbol("block_offset_{}".format(i), np.uint32) for i in range(3))
-
-        rng_symbol_gen = random_symbol(
-            collision_rule.subexpressions, seed=seed,
-            rng_node=rng_node, dim=method.dim, offsets=block_offsets
-        )
+    rng_symbol_gen = random_symbol(
+        collision_rule.subexpressions, seed=seed,
+        rng_node=rng_node, dim=method.dim, offsets=block_offsets
+    )
 
     correction = fluctuation_correction(method, rng_symbol_gen, amplitudes)
 

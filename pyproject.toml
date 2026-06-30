@@ -135,7 +135,6 @@ omit = [
     "quicktest.py",
     "noxfile.py",
     "src/lbmpy/_version.py",
-    "src/lbmpy/_compat.py",
     "venv/",
 ]
 

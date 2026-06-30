@@ -1,7 +1,5 @@
 import sympy as sp
 
-from .._compat import IS_PYSTENCILS_2
-
 from lbmpy.advanced_streaming.indexing import BetweenTimestepsIndexing
 from lbmpy.advanced_streaming.utility import Timestep, get_accessor
 from pystencils.boundaries.boundaryhandling import BoundaryOffsetInfo
@@ -10,11 +8,8 @@ from pystencils.simp import AssignmentCollection, sympy_cse_on_assignment_list
 from pystencils.stencil import inverse_direction
 from pystencils.sympyextensions import fast_subs
 
-if IS_PYSTENCILS_2:
-    from lbmpy.lookup_tables import LbmWeightInfo
-else:
-    from lbmpy.custom_code_nodes import LbmWeightInfo
-    from pystencils.astnodes import Block, Conditional, LoopOverCoordinate, SympyAssignment  # TODO replace
+from lbmpy.custom_code_nodes import LbmWeightInfo
+from pystencils.astnodes import Block, Conditional, LoopOverCoordinate, SympyAssignment  # TODO replace
 
 
 def direction_indices_in_direction(direction, stencil):
@@ -63,9 +58,6 @@ def border_conditions(direction, field, ghost_layers=1):
 
 
 def boundary_conditional(boundary, direction, streaming_pattern, prev_timestep, lb_method, output_field, cse=False):
-    if IS_PYSTENCILS_2:
-        raise NotImplementedError("In-Kernel Boundaries are not yet available on pystencils 2.0")
-
     stencil = lb_method.stencil
 
     dir_indices = direction_indices_in_direction(direction, stencil)

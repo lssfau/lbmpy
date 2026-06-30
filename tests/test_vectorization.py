@@ -3,7 +3,7 @@ import pytest
 from dataclasses import replace
 
 import pystencils as ps
-from lbmpy._compat import get_supported_instruction_sets, IS_PYSTENCILS_2
+from pystencils.backends.simd_instruction_sets import get_supported_instruction_sets
 from lbmpy.scenarios import create_lid_driven_cavity
 from lbmpy.creationfunctions import LBMConfig, LBMOptimisation
 
@@ -76,13 +76,8 @@ def test_lbm_vectorization(
     config = ps.CreateKernelConfig(
         data_type="float64" if double_precision else "float32",
         cpu_vectorize_info=vectorization_options,
+        default_number_float="float64" if double_precision else "float32",
     )
-
-    if not IS_PYSTENCILS_2:
-        config = replace(
-            config,
-            default_number_float="float64" if double_precision else "float32",
-        )
 
     lbm_opt_split = LBMOptimisation(cse_global=True, split=True)
     lbm_opt = LBMOptimisation(cse_global=True, split=False)

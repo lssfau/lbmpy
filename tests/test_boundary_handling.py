@@ -15,8 +15,6 @@ from pystencils import create_data_handling, make_slice, Target, CreateKernelCon
 from pystencils.slicing import slice_from_direction
 from pystencils.stencil import inverse_direction
 
-from lbmpy._compat import IS_PYSTENCILS_2
-
 
 def mirror_stencil(direction, mirror_axis):
     for i, n in enumerate(mirror_axis):
@@ -487,7 +485,6 @@ def test_force_on_boundary(given_force_vector, dtype):
             method,
             boundary,
             force_vector=force_vector,
-            **({"default_dtype": dtype} if IS_PYSTENCILS_2 else dict())
         )
 
 

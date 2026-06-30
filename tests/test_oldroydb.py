@@ -6,7 +6,6 @@ from pystencils.boundaries.boundaryconditions import Neumann, Dirichlet
 from lbmpy.boundaries.boundaryhandling import LatticeBoltzmannBoundaryHandling
 from lbmpy.boundaries import NoSlip
 
-from lbmpy._compat import IS_PYSTENCILS_2
 from lbmpy.oldroydb import *
 import pytest
 
@@ -17,7 +16,6 @@ import pytest
 pytest.importorskip('scipy.optimize')
 
 
-@pytest.mark.xfail(IS_PYSTENCILS_2, reason="Staggered kernels are unavailable")
 def test_oldroydb():
     import scipy.optimize
 

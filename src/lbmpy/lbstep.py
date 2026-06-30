@@ -15,11 +15,7 @@ from pystencils import CreateKernelConfig
 from pystencils import create_data_handling, create_kernel, make_slice, Target
 from pystencils.slicing import SlicedGetter
 from pystencils.timeloop import TimeLoop
-
-
-from ._compat import IS_PYSTENCILS_2
-if not IS_PYSTENCILS_2:
-    from pystencils import Backend
+from pystencils import Backend
 
 
 class LatticeBoltzmannStep:
@@ -45,10 +41,7 @@ class LatticeBoltzmannStep:
                 raise ValueError("When passing a data_handling, the domain_size parameter can not be specified")
 
         if config is not None:
-            if IS_PYSTENCILS_2:
-                target = config.get_target()
-            else:
-                target = config.target
+            target = config.target
         else:
             target = optimization.get('target', Target.CPU)
 
@@ -72,11 +65,7 @@ class LatticeBoltzmannStep:
                                                                               lbm_config, lbm_optimisation, config)
 
         # the parallel datahandling understands only numpy datatypes. Strings lead to an errors
-        if IS_PYSTENCILS_2:
-            from pystencils import create_type
-            field_dtype = create_type(config.get_option("default_dtype")).numpy_dtype
-        else:
-            field_dtype = config.data_type.default_factory().numpy_dtype
+        field_dtype = config.data_type.default_factory().numpy_dtype
 
         if lbm_kernel:
             q = lbm_kernel.method.stencil.Q
@@ -91,21 +80,14 @@ class LatticeBoltzmannStep:
         self.density_data_name = name + "_density" if density_data_name is None else density_data_name
         self.density_data_index = density_data_index
 
-        if IS_PYSTENCILS_2:
-            self._gpu = target.is_gpu()
-        else:
-            self._gpu = target == Target.GPU
+        self._gpu = target == Target.GPU
 
         layout = lbm_optimisation.field_layout
 
         alignment = False
 
-        if IS_PYSTENCILS_2:
-            if config.get_target().is_vector_cpu() and config.cpu.vectorize.enable:
-                alignment = alignment_if_vectorized
-        else:
-            if config.backend == Backend.C and config.cpu_vectorize_info:
-                alignment = alignment_if_vectorized
+        if config.backend == Backend.C and config.cpu_vectorize_info:
+            alignment = alignment_if_vectorized
 
         self._data_handling.add_array(self._pdf_arr_name, values_per_cell=q, gpu=self._gpu, layout=layout,
                                       latex_name='src', dtype=field_dtype, alignment=alignment)
@@ -181,7 +163,6 @@ class LatticeBoltzmannStep:
             flag_interface=flag_interface,
             target=target,
             openmp=config.cpu_openmp,
-            **({"default_dtype": field_dtype} if IS_PYSTENCILS_2 else dict())
         )
 
         self._lbm_config = lbm_config
@@ -468,12 +449,7 @@ class LatticeBoltzmannStep:
         rho_field = rho_field.center if self.density_data_index is None else rho_field(self.density_data_index)
         vel_field = self._data_handling.fields[self.velocity_data_name]
 
-        if IS_PYSTENCILS_2:
-            gen_config = CreateKernelConfig(target=Target.CPU)
-            gen_config.cpu.openmp.enable = self._config.cpu.openmp.get_option("enable")
-            gen_config.default_dtype = self._config.get_option("default_dtype")
-        else:
-            gen_config = CreateKernelConfig(target=Target.CPU, cpu_openmp=self._config.cpu_openmp)
+        gen_config = CreateKernelConfig(target=Target.CPU, cpu_openmp=self._config.cpu_openmp)
 
         getter_eqs = cqc.output_equations_from_pdfs(pdf_field.center_vector,
                                                     {'density': rho_field, 'velocity': vel_field})

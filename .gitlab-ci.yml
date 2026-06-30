@@ -176,7 +176,7 @@ build-documentation:
     - pip install -e .
   script:
     - export PYTHONPATH=`pwd`
-    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@master#egg=pystencils
+    - pip install git+https://gitlab-ci-token:${CI_JOB_TOKEN}@i10git.cs.fau.de/pycodegen/pystencils.git@v1.x#egg=pystencils
     - mkdir html_doc
     - sphinx-build -W -b html doc html_doc
   tags:
