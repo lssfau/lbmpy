@@ -48,7 +48,7 @@ def install_cupy(
                 return
 
         cuda_major = cuda_version[0]
-        cupy_package = f"cupy-cuda{cuda_major}x=={cupy_version}"
+        cupy_package = f"cupy-cuda{cuda_major}x~={cupy_version}"
         session.install(cupy_package)
 
 
@@ -90,67 +90,45 @@ def lint(session: nox.Session):
 @nox.session(python="3.10", tags=["qa", "code-quality"])
 def typecheck(session: nox.Session):
     """Run MyPy for static type checking"""
+    install_pystencils_master(session)
     editable_install(session)
     session.install("mypy")
     session.run("mypy", "src/lbmpy")
 
 
-def run_testsuite(session: nox.Session, coverage: bool = True):
+@nox.session(python=["3.10", "3.11", "3.12", "3.13"])
+@nox.parametrize("platform", ["cpu", "cupy"], ids=["cpu", "cupy"])
+def testsuite(session: nox.Session, platform: str):
+    if platform == "cupy":
+        install_cupy(session, "14.0", skip_if_no_cuda=True)
+    install_pystencils_master(session)
+    editable_install(session, ["alltrafos", "use_cython", "interactive", "tests"])
+    
     num_cores = os.cpu_count()
 
-    args = [
+    session.run(
         "pytest",
         "-v",
         "-n",
         str(num_cores),
+        "--cov",
         "-m",
         "not longrun",
         "--html",
         "test-report/index.html",
         "--junitxml=report.xml",
-    ]
-
-    if coverage:
-        args += [
-            "--cov-report=term",
-            "--cov=.",
-        ]
-
-    session.run(*args)
-
-    if coverage:
-        session.run("coverage", "html")
-        session.run("coverage", "xml")
-
-
-@nox.session(python=["3.10", "3.11", "3.12", "3.13"])
-def testsuite_cpu(session: nox.Session):
-    install_pystencils_master(session)
-    editable_install(session, ["alltrafos", "use_cython", "interactive", "tests"])
-    run_testsuite(session, coverage=False)
-
-
-@nox.session(python=["3.10", "3.11", "3.12", "3.13"])
-@nox.parametrize("cupy_version", ["12", "13"], ids=["cupy12", "cupy13"])
-def testsuite_gpu(session: nox.Session, cupy_version: str | None):
-    install_cupy(session, cupy_version, skip_if_no_cuda=True)
-    install_pystencils_master(session)
-    editable_install(session, ["alltrafos", "use_cython", "interactive", "tests"])
-    run_testsuite(session)
-
-
-@nox.parametrize("cupy_version", [None, "12", "13"], ids=["cpu", "cupy12", "cupy13"])
-@nox.session(python="3.10", tags=["test"])
-def testsuite_pystencils2(session: nox.Session, cupy_version: str | None):
-    if cupy_version is not None:
-        install_cupy(session, cupy_version, skip_if_no_cuda=True)
-
-    session.install(
-        "git+https://i10git.cs.fau.de/pycodegen/pystencils.git@v2.0-dev"
+        *session.posargs,
     )
-    editable_install(session, ["alltrafos", "use_cython", "interactive", "tests"])
 
-    run_testsuite(session)
+
+@nox.session
+def coverage_report(session: nox.Session):
+    session.install("coverage")
+
+    session.run("coverage", "combine")
+    session.run("coverage", "report", "--precision=2")
+    session.run("coverage", "html")
+    session.run("coverage", "xml")
 
 
 @nox.session
