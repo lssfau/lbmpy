@@ -12,7 +12,14 @@ authors = [
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-dependencies = ["pystencils>=1.4", "sympy>=1.12", "numpy>=1.8.0", "appdirs", "joblib", "packaging"]
+dependencies = [
+    "pystencils>=1.4",
+    "sympy>=1.12",
+    "numpy>=1.8.0",
+    "appdirs",
+    "joblib",
+    "packaging",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Jupyter",
@@ -40,11 +47,10 @@ interactive = [
     'rich',
     'graphviz',
     'scipy',
-    'scikit-image'
+    'scikit-image',
 ]
-use_cython = [
-    'Cython'
-]
+use_cython = ["Cython", "setuptools; python_version >= '3.12'"]
+dev = ["flake8", "mypy", "black"]
 doc = [
     'sphinx',
     'sphinx_rtd_theme',
@@ -67,10 +73,7 @@ tests = [
 ]
 
 [build-system]
-requires = [
-    "setuptools>=69",
-    "versioneer[toml]>=0.29",
-]
+requires = ["setuptools>=69", "versioneer[toml]>=0.29"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
@@ -90,3 +93,74 @@ versionfile_source = "src/lbmpy/_version.py"
 versionfile_build = "lbmpy/_version.py"
 tag_prefix = "release/"
 parentdir_prefix = "lbmpy-"
+
+[tool.pytest]
+testpaths = ["src", "tests", "doc/notebooks"]
+python_files = ["test_*.py", "*_test.py", "scenario_*.py"]
+norecursedirs = [
+    "*.egg-info",
+    ".git",
+    ".cache",
+    ".ipynb_checkpoints",
+    "coverage_report",
+]
+addopts = [
+    "--doctest-modules",
+    "--durations=20 ",
+    "--cov-config=pyproject.toml",
+    "--ignore=src/lbmpy/custom_code_nodes.py",
+    "--ignore=src/lbmpy/lookup_tables.py",
+    "--ignore=src/lbmpy/phasefield_allen_cahn/contact_angle.py",
+]
+markers = [
+    "longrun: tests only run at night since they have large execution time",
+    "notebook: mark for notebooks",
+]
+filterwarnings = [
+    "ignore:the imp module is deprecated in favour of importlib:DeprecationWarning",
+    "ignore:'contextfilter' is renamed to 'pass_context':DeprecationWarning",
+    "ignore:Persisting input arguments took:UserWarning",
+]
+
+[tool.coverage.run]
+branch = true
+include = ["src/lbmpy/**/*.py", "tests/**/*.py"]
+relative_files = true
+omit = [
+    "doc/*",
+    "tests/*",
+    "setup.py",
+    "conftest.py",
+    "versioneer.py",
+    "quicktest.py",
+    "noxfile.py",
+    "src/lbmpy/_version.py",
+    "src/lbmpy/_compat.py",
+    "venv/",
+]
+
+[tool.coverage.report]
+include = ["src/lbmpy/**/*.py", "tests/**/*.py"]
+exclude_also = [
+    "def __repr__",
+    "def _repr_html_",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "NotImplementedError()",
+    #raise ValueError
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if False:",
+    "if __name__ == .__main__.:",
+    "assert False",
+
+    # Don't cover type checking imports
+    "if TYPE_CHECKING:",
+]
+skip_covered = true
+
+[tool.coverage.html]
+directory = "coverage_report"

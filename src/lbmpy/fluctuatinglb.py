@@ -17,7 +17,7 @@ from pystencils.simp.assignment_collection import SymbolGen
 
 if IS_PYSTENCILS_2:
     from pystencils.sympyextensions.random import RngBase, Philox
-    from pystencils.sympyextensions import tcast
+    from pystencils.sympyextensions import tcast, DynamicType
 else:
     from pystencils.rng import PhiloxFourFloats, random_symbol
 
@@ -57,8 +57,15 @@ def add_fluctuations_to_collision_rule(collision_rule, temperature=None, amplitu
         raise ValueError("Fluctuations can only be added to weighted-orthogonal methods")
 
     if IS_PYSTENCILS_2:
-        rng: RngBase = kwargs.get("rng", Philox("fluctuation_rng", np.float32, TypedSymbol("seed", np.uint32)))
-        ts = TypedSymbol("time_step", np.uint32)
+        rng: RngBase = kwargs.get(
+            "rng",
+            Philox(
+                "fluctuation_rng",
+                np.float32,
+                TypedSymbol("seed", DynamicType.INDEX_TYPE)
+            )
+        )
+        ts = TypedSymbol("time_step", DynamicType.INDEX_TYPE)
 
         def _rng_symbol_gen():
             while True:
