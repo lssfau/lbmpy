@@ -58,8 +58,6 @@ from dataclasses import dataclass, field, replace
 from typing import Union, List, Tuple, Any, Type, Iterable
 from warnings import warn, filterwarnings
 
-from ._compat import IS_PYSTENCILS_2
-
 import sympy as sp
 
 from lbmpy.enums import Stencil, Method, ForceModel, CollisionSpace, SubgridScaleModel
@@ -92,10 +90,7 @@ from pystencils.simp import sympy_cse, SimplificationStrategy
 from lbmpy.methods.abstractlbmethod import LbmCollisionRule, AbstractLbMethod
 from lbmpy.methods.cumulantbased import CumulantBasedLbMethod
 
-if IS_PYSTENCILS_2:
-    from pystencils import Kernel as KernelFunction
-else:
-    from pystencils.astnodes import KernelFunction
+from pystencils import Kernel as KernelFunction
 
 # Filter out JobLib warnings. They are not useful for use:
 # https://github.com/joblib/joblib/issues/683
@@ -601,10 +596,7 @@ def create_lb_update_rule(collision_rule=None, lbm_config=None, lbm_optimisation
 
     lb_method = collision_rule.method
 
-    if IS_PYSTENCILS_2:
-        fallback_field_data_type = config.get_option("default_dtype")
-    else:
-        fallback_field_data_type = config.data_type[lbm_config.field_name].numpy_dtype
+    fallback_field_data_type = config.get_option("default_dtype")
 
     q = collision_rule.method.stencil.Q
 
@@ -876,12 +868,11 @@ def create_lb_method(lbm_config=None, **params):
 
 
 def create_psm_update_rule(lbm_config, lbm_optimisation):
-    if IS_PYSTENCILS_2:
-        raise NotImplementedError(
-            "`create_psm_update_rule` is not yet available when using pystencils 2.0. "
-            "To instead derive a (potentially less efficient) PSM kernel without branches, "
-            "use `create_lb_update_rule` with a `PsmConfig` object instead."
-        )
+    raise NotImplementedError(
+        "`create_psm_update_rule` is not yet available in lbmpy 2.0. "
+        "To instead derive a (potentially less efficient) PSM kernel without branches, "
+        "use `create_lb_update_rule` with a `PsmConfig` object instead."
+    )
     
     from pystencils.astnodes import Conditional, Block
     from pystencils.node_collection import NodeCollection

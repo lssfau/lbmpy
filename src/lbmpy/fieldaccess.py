@@ -2,14 +2,13 @@ import abc
 
 import sympy as sp
 
-from pystencils import Field
+from pystencils import Field, DEFAULTS
 # ------------------------------------------------ Interface -----------------------------------------------------------
 
 from pystencils.stencil import inverse_direction
 
 from lbmpy.enums import Stencil
 from lbmpy.stencils import LBStencil
-from ._compat import get_loop_counter_symbol
 
 __all__ = ['PdfFieldAccessor', 'CollideOnlyInplaceAccessor', 'StreamPullTwoFieldsAccessor',
            'AAEvenTimeStepAccessor', 'AAOddTimeStepAccessor',
@@ -115,7 +114,7 @@ class PeriodicTwoFieldsAccessor(PdfFieldAccessor):
                 lower_limit = self._ghostLayers
                 upper_limit = field.spatial_shape[coord_id] - 1 - self._ghostLayers
                 limit_diff = upper_limit - lower_limit
-                loop_counter = get_loop_counter_symbol(coord_id)
+                loop_counter = DEFAULTS.spatial_counters[coord_id]
                 if dir_element == 0:
                     periodic_pull_direction.append(0)
                 elif dir_element == 1:

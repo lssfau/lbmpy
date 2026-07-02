@@ -1,4 +1,3 @@
-from dataclasses import replace
 import numpy as np
 
 from pystencils import Assignment, CreateKernelConfig, create_kernel, Field, Target, FieldType
@@ -10,10 +9,8 @@ from pystencils.stencil import inverse_direction
 from lbmpy.advanced_streaming.indexing import BetweenTimestepsIndexing
 from lbmpy.advanced_streaming.utility import is_inplace, Timestep, AccessPdfValues
 
-from .._compat import IS_PYSTENCILS_2
 
-if IS_PYSTENCILS_2:
-    from pystencils.types import PsNumericType
+from pystencils.types import PsNumericType
 
 
 class LatticeBoltzmannBoundaryHandling(BoundaryHandling):
@@ -74,15 +71,10 @@ class LatticeBoltzmannBoundaryHandling(BoundaryHandling):
         return self._boundary_object_to_boundary_info[boundary_obj].flag
 
     def _create_boundary_kernel(self, symbolic_field, symbolic_index_field, boundary_obj, prev_timestep=Timestep.BOTH):
-        if IS_PYSTENCILS_2:
-            additional_args = {"default_dtype": self._default_dtype}
-        else:
-            additional_args = dict()
-            
         return create_lattice_boltzmann_boundary_kernel(
             symbolic_field, symbolic_index_field, self._lb_method, boundary_obj,
             prev_timestep=prev_timestep, streaming_pattern=self._streaming_pattern,
-            target=self._target, cpu_openmp=self._openmp, **additional_args)
+            target=self._target, cpu_openmp=self._openmp, default_dtype=self._default_dtype)
 
     class InplaceStreamingBoundaryInfo(object):
 
@@ -171,8 +163,6 @@ class LatticeBoltzmannBoundaryHandling(BoundaryHandling):
 def create_lattice_boltzmann_boundary_kernel(pdf_field, index_field, lb_method, boundary_functor,
                                              prev_timestep=Timestep.BOTH, streaming_pattern='pull',
                                              target=Target.CPU, force_vector=None, **kernel_creation_args):
-    from .._compat import IS_PYSTENCILS_2
-
     indexing = BetweenTimestepsIndexing(
         pdf_field, lb_method.stencil, prev_timestep, streaming_pattern, np.int32, np.int32)
 
@@ -181,69 +171,38 @@ def create_lattice_boltzmann_boundary_kernel(pdf_field, index_field, lb_method, 
     dir_symbol = indexing.dir_symbol
     inv_dir = indexing.inverse_dir_symbol
 
-    if IS_PYSTENCILS_2:
-        from pystencils.types.quick import SInt
-        config = CreateKernelConfig(
-            index_field=index_field,
-            target=target,
-            index_dtype=SInt(32),
-            skip_independence_check=True,
-            **kernel_creation_args
-        )
+    from pystencils.types.quick import SInt
+    config = CreateKernelConfig(
+        index_field=index_field,
+        target=target,
+        index_dtype=SInt(32),
+        skip_independence_check=True,
+        **kernel_creation_args
+    )
 
-        default_data_type: PsNumericType = config.get_option("default_dtype")
+    default_data_type: PsNumericType = config.get_option("default_dtype")
 
-        if force_vector is None:
-            force_vector_type = np.dtype([(f"F_{i}", default_data_type.numpy_dtype) for i in range(dim)], align=True)
-            force_vector = Field.create_generic('force_vector', spatial_dimensions=1,
-                                                dtype=force_vector_type, field_type=FieldType.INDEXED)
+    if force_vector is None:
+        force_vector_type = np.dtype([(f"F_{i}", default_data_type.numpy_dtype) for i in range(dim)], align=True)
+        force_vector = Field.create_generic('force_vector', spatial_dimensions=1,
+                                            dtype=force_vector_type, field_type=FieldType.INDEXED)
 
-        boundary_assignments = boundary_functor(f_out, f_in, dir_symbol, inv_dir, lb_method, index_field, force_vector)
-        boundary_assignments = indexing.substitute_proxies(boundary_assignments)
+    boundary_assignments = boundary_functor(f_out, f_in, dir_symbol, inv_dir, lb_method, index_field, force_vector)
+    boundary_assignments = indexing.substitute_proxies(boundary_assignments)
 
-        if pdf_field.dtype != default_data_type:
-            boundary_assignments = add_subexpressions_for_field_reads(boundary_assignments, data_type=default_data_type)
+    if pdf_field.dtype != default_data_type:
+        boundary_assignments = add_subexpressions_for_field_reads(boundary_assignments, data_type=default_data_type)
 
-        elements: list[Assignment] = []
+    elements: list[Assignment] = []
 
-        index_arrs_node = indexing.create_code_node()
-        elements += index_arrs_node.get_array_declarations()
+    index_arrs_node = indexing.create_code_node()
+    elements += index_arrs_node.get_array_declarations()
+    
+    for node in boundary_functor.get_additional_code_nodes(lb_method)[::-1]:
+        elements += node.get_array_declarations()
         
-        for node in boundary_functor.get_additional_code_nodes(lb_method)[::-1]:
-            elements += node.get_array_declarations()
-            
-        elements += [Assignment(dir_symbol, index_field[0]('dir'))]
-        elements += boundary_assignments.all_assignments
+    elements += [Assignment(dir_symbol, index_field[0]('dir'))]
+    elements += boundary_assignments.all_assignments
 
-        kernel = create_kernel(elements, config=config)
-        return kernel
-    else:
-        config = CreateKernelConfig(index_fields=[index_field], target=target, default_number_int="int32",
-                                    skip_independence_check=True, **kernel_creation_args)
-
-        default_data_type = config.data_type.default_factory()
-
-        if force_vector is None:
-            force_vector_type = np.dtype([(f"F_{i}", default_data_type.c_name) for i in range(dim)], align=True)
-            force_vector = Field.create_generic('force_vector', spatial_dimensions=1,
-                                                dtype=force_vector_type, field_type=FieldType.INDEXED)
-
-        config = replace(config, index_fields=[index_field, force_vector])
-
-        boundary_assignments = boundary_functor(f_out, f_in, dir_symbol, inv_dir, lb_method, index_field, force_vector)
-        boundary_assignments = indexing.substitute_proxies(boundary_assignments)
-
-        if pdf_field.dtype != default_data_type:
-            boundary_assignments = add_subexpressions_for_field_reads(boundary_assignments, data_type=default_data_type)
-
-        elements = [Assignment(dir_symbol, index_field[0]('dir'))]
-        elements += boundary_assignments.all_assignments
-
-        kernel = create_kernel(elements, config=config)
-
-        #   Code Elements ahead of the loop
-        index_arrs_node = indexing.create_code_node()
-        for node in boundary_functor.get_additional_code_nodes(lb_method)[::-1]:
-            kernel.body.insert_front(node)
-        kernel.body.insert_front(index_arrs_node)
-        return kernel
+    kernel = create_kernel(elements, config=config)
+    return kernel

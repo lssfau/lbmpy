@@ -3,11 +3,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 import sympy as sp
 
-from ._compat import IS_PYSTENCILS_2
-
-if not IS_PYSTENCILS_2:
-    raise ImportError("`lbmpy.lookup_tables` is only available when running with pystencils 2.x")
-
 from pystencils import Assignment
 from pystencils.sympyextensions import TypedSymbol
 from pystencils.types.quick import Arr

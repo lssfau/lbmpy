@@ -7,8 +7,6 @@ from lbmpy.enums import Method, Stencil
 from lbmpy.scenarios import create_lid_driven_cavity
 from lbmpy.stencils import LBStencil
 
-from lbmpy._compat import IS_PYSTENCILS_2
-
 
 @pytest.mark.parametrize("double_precision", [False, True])
 @pytest.mark.parametrize(
@@ -17,15 +15,9 @@ from lbmpy._compat import IS_PYSTENCILS_2
 def test_creation(double_precision, method_enum):
     """Simple test that makes sure that only float variables are created"""
     lbm_config = LBMConfig(method=method_enum, relaxation_rate=1.5, compressible=True)
-    if IS_PYSTENCILS_2:
-        config = ps.CreateKernelConfig(
-            default_dtype="float64" if double_precision else "float32"
-        )
-    else:
-        config = ps.CreateKernelConfig(
-            data_type="float64" if double_precision else "float32",
-            default_number_float="float64" if double_precision else "float32",
-        )
+    config = ps.CreateKernelConfig(
+        default_dtype="float64" if double_precision else "float32"
+    )
     func = create_lb_function(lbm_config=lbm_config, config=config)
     code = ps.get_code_str(func)
 
@@ -49,15 +41,10 @@ def test_scenario(method_enum, numeric_type):
         compressible=True,
     )
 
-    if IS_PYSTENCILS_2:
-        config = ps.CreateKernelConfig(
-            default_dtype=numeric_type
-        )
-    else:
-        config = ps.CreateKernelConfig(
-            data_type=numeric_type,
-            default_number_float=numeric_type
-        )
+    config = ps.CreateKernelConfig(
+        default_dtype=numeric_type
+    )
+
     sc = create_lid_driven_cavity((16, 16, 8), lbm_config=lbm_config, config=config)
     sc.run(1)
     code = ps.get_code_str(sc.ast)

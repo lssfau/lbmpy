@@ -1,6 +1,11 @@
 lbmpy
 =====
 
+> [!note]
+> This is lbmpy 2.0, the latest incarnation of lbmpy based on [pystencils 2.0](https://i10git.cs.fau.de/pycodegen/pystencils).
+> The legacy package lbmpy 1.4 has moved to the branch [lbmpy/v1.x](https://i10git.cs.fau.de/pycodegen/lbmpy/-/tree/v1.x)
+> and only receives basic maintenance.
+
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mabau/lbmpy/master?filepath=doc%2Fnotebooks)
 [![Docs](https://img.shields.io/badge/read-the_docs-brightgreen.svg)](http://pycodegen.pages.i10git.cs.fau.de/lbmpy)
 [![pipeline status](https://i10git.cs.fau.de/pycodegen/lbmpy/badges/master/pipeline.svg)](https://i10git.cs.fau.de/pycodegen/lbmpy/commits/master)
