@@ -1,20 +1,12 @@
 import sympy as sp
 
-from .._compat import IS_PYSTENCILS_2
-
-from lbmpy.advanced_streaming.indexing import BetweenTimestepsIndexing
 from lbmpy.advanced_streaming.utility import Timestep, get_accessor
 from pystencils.boundaries.boundaryhandling import BoundaryOffsetInfo
-from pystencils import Assignment
-from pystencils.simp import AssignmentCollection, sympy_cse_on_assignment_list
+from pystencils import Assignment, DEFAULTS
 from pystencils.stencil import inverse_direction
 from pystencils.sympyextensions import fast_subs
 
-if IS_PYSTENCILS_2:
-    from lbmpy.lookup_tables import LbmWeightInfo
-else:
-    from lbmpy.custom_code_nodes import LbmWeightInfo
-    from pystencils.astnodes import Block, Conditional, LoopOverCoordinate, SympyAssignment  # TODO replace
+from lbmpy.lookup_tables import LbmWeightInfo
 
 
 def direction_indices_in_direction(direction, stencil):
@@ -45,7 +37,7 @@ def border_conditions(direction, field, ghost_layers=1):
     idx = abs_direction.index(1)
     val = direction[idx]
 
-    loop_ctrs = [LoopOverCoordinate.get_loop_counter_symbol(i) for i in range(len(direction))]
+    loop_ctrs = [DEFAULTS.spatial_counters[i] for i in range(len(direction))]
     loop_ctr = loop_ctrs[idx]
 
     gl = ghost_layers
@@ -63,33 +55,33 @@ def border_conditions(direction, field, ghost_layers=1):
 
 
 def boundary_conditional(boundary, direction, streaming_pattern, prev_timestep, lb_method, output_field, cse=False):
-    if IS_PYSTENCILS_2:
-        raise NotImplementedError("In-Kernel Boundaries are not yet available on pystencils 2.0")
+    raise NotImplementedError("In-Kernel Boundaries are not yet available in lbmpy 2.0")
 
-    stencil = lb_method.stencil
+    #   TODO reimplement using ps.flow conditionals
+    # stencil = lb_method.stencil
 
-    dir_indices = direction_indices_in_direction(direction, stencil)
-    indexing = BetweenTimestepsIndexing(output_field, lb_method.stencil, prev_timestep, streaming_pattern)
-    f_out, f_in = indexing.proxy_fields
-    inv_dir = indexing.inverse_dir_symbol
+    # dir_indices = direction_indices_in_direction(direction, stencil)
+    # indexing = BetweenTimestepsIndexing(output_field, lb_method.stencil, prev_timestep, streaming_pattern)
+    # f_out, f_in = indexing.proxy_fields
+    # inv_dir = indexing.inverse_dir_symbol
 
-    assignments = []
-    for direction_idx in dir_indices:
-        rule = boundary(f_out, f_in, direction_idx, inv_dir, lb_method, index_field=None, force_vector=None)
+    # assignments = []
+    # for direction_idx in dir_indices:
+    #     rule = boundary(f_out, f_in, direction_idx, inv_dir, lb_method, index_field=None, force_vector=None)
 
-        #   rhs: replace f_out by post collision symbols.
-        rhs_substitutions = {f_out(i): sym for i, sym in enumerate(lb_method.post_collision_pdf_symbols)}
-        rule = AssignmentCollection([rule]).new_with_substitutions(rhs_substitutions)
-        rule = indexing.substitute_proxies(rule)
+    #     #   rhs: replace f_out by post collision symbols.
+    #     rhs_substitutions = {f_out(i): sym for i, sym in enumerate(lb_method.post_collision_pdf_symbols)}
+    #     rule = AssignmentCollection([rule]).new_with_substitutions(rhs_substitutions)
+    #     rule = indexing.substitute_proxies(rule)
 
-        ac = rule.new_without_subexpressions()
-        assignments += ac.main_assignments
+    #     ac = rule.new_without_subexpressions()
+    #     assignments += ac.main_assignments
 
-    border_cond = border_conditions(direction, output_field, ghost_layers=1)
-    if cse:
-        assignments = sympy_cse_on_assignment_list(assignments)
-    assignments = [SympyAssignment(a.lhs, a.rhs) for a in assignments]
-    return Conditional(border_cond, Block(assignments))
+    # border_cond = border_conditions(direction, output_field, ghost_layers=1)
+    # if cse:
+    #     assignments = sympy_cse_on_assignment_list(assignments)
+    # assignments = [SympyAssignment(a.lhs, a.rhs) for a in assignments]
+    # return Conditional(border_cond, Block(assignments))
 
 
 def update_rule_with_push_boundaries(collision_rule, field, boundary_spec, 

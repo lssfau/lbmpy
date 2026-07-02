@@ -12,7 +12,6 @@ import pytest
 
 from pystencils import Target
 
-from lbmpy._compat import get_supported_instruction_sets
 from lbmpy.boundaries.boundaryconditions import NoSlip
 from lbmpy.geometry import get_pipe_velocity_field
 from lbmpy.relaxationrates import relaxation_rate_from_lattice_viscosity
@@ -150,10 +149,8 @@ def long_run(steady=True, **kwargs):
     plt.show()
 
 
-@pytest.mark.skipif(not get_supported_instruction_sets(), reason='cannot detect CPU instruction set')
 def test_schaefer_turek():
-    opt = {'vectorization': {'instruction_set': get_supported_instruction_sets()[-1], 'assume_aligned': True}, 'openmp': 2}
-    sc_2d_1 = schaefer_turek_2d(30, max_lattice_velocity=0.08, optimization=opt)
+    sc_2d_1 = schaefer_turek_2d(30, max_lattice_velocity=0.08)
     sc_2d_1.run(30000)
     result = evaluate_static_quantities(sc_2d_1)
     assert 5.5 < result['c_D'] < 5.8

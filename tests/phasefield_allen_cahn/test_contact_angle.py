@@ -6,14 +6,12 @@ from pystencils.boundaries.boundaryhandling import BoundaryHandling
 
 from lbmpy.enums import Stencil
 from lbmpy.stencils import LBStencil
-from lbmpy._compat import IS_PYSTENCILS_2
 
 import numpy as np
 
 
 @pytest.mark.skipif(
-    IS_PYSTENCILS_2,
-    reason="Contact angle calculation not yet available with pystencils 2.0"
+    reason="Contact angle calculation not yet available in lbmpy 2.0"
 )
 def test_contact_angle():
     from lbmpy.phasefield_allen_cahn.contact_angle import ContactAngle
