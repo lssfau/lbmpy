@@ -13,7 +13,7 @@ license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = [
-    "pystencils>=2.0b2",
+    "pystencils~=2.0",
     "sympy>=1.12",
     "numpy>=1.8.0",
     "appdirs",

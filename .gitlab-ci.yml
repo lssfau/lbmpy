@@ -193,7 +193,7 @@ pages:
   rules:
     - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PROJECT_PATH == "pycodegen/lbmpy" && $CI_COMMIT_BRANCH == "master"'
   stage: deploy
-  needs: ["testsuite-cuda-py3.10", "build-documentation"]
+  needs: ["coverage-report", "build-documentation"]
   script:
     - mv html_doc public
     - mv coverage_report public/coverage_report
