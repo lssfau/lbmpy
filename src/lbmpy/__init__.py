@@ -26,7 +26,6 @@ from .relaxationrates import (
 from .scenarios import create_lid_driven_cavity, create_fully_periodic_flow
 from .stencils import LBStencil
 
-
 __all__ = [
     "create_lb_ast",
     "create_lb_collision_rule",
@@ -58,4 +57,5 @@ __all__ = [
 
 
 from . import _version
-__version__ = _version.get_versions()['version']
+
+__version__ = _version.get_versions()["version"]

@@ -5,8 +5,6 @@ from lbmpy.enums import Stencil
 from lbmpy.stencils import LBStencil
 
 from lbmpy.methods.creationfunctions import create_with_monomial_cumulants
-from lbmpy.maxwellian_equilibrium import get_weights
-
 
 @pytest.mark.parametrize('stencil', [Stencil.D2Q9, Stencil.D3Q19])
 def test_zero_centering_equilibrium_equivalence(stencil):
@@ -14,7 +12,7 @@ def test_zero_centering_equilibrium_equivalence(stencil):
     omega = sp.Symbol('omega')
     r_rates = (omega,) * stencil.Q
 
-    weights = sp.Matrix(get_weights(stencil))
+    weights = sp.Matrix(stencil.weights)
 
     rho = sp.Symbol("rho")
     rho_background = sp.Integer(1)

@@ -310,7 +310,7 @@ class MomentBasedLbMethod(AbstractLbMethod):
         for w in weights:
             assert is_constant(w)
 
-        return [w for w in weights]
+        return tuple([w for w in weights])
 
     def _bound_symbols_cqc(self, conserved_quantity_equations: AssignmentCollection = None) -> Set[sp.Symbol]:
         f = self.pre_collision_pdf_symbols

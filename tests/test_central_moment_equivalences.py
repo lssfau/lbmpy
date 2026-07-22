@@ -5,7 +5,6 @@ from lbmpy.enums import Stencil
 from lbmpy.stencils import LBStencil
 
 from lbmpy.methods.creationfunctions import create_central_moment
-from lbmpy.maxwellian_equilibrium import get_weights
 
 from lbmpy.moment_transforms import PdfsToMomentsByChimeraTransform
 
@@ -42,7 +41,7 @@ def test_zero_centering_equilibrium_equivalence(stencil, compressible, delta_eq)
     omega = sp.Symbol('omega')
     r_rates = (omega,) * stencil.Q
 
-    weights = sp.Matrix(get_weights(stencil))
+    weights = sp.Matrix(stencil.weights)
 
     rho = sp.Symbol("rho")
     rho_background = sp.Integer(1)

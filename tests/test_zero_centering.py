@@ -6,7 +6,6 @@ from pystencils import CreateKernelConfig, Target
 
 from lbmpy import Method, LBMConfig
 from lbmpy.stencils import Stencil, LBStencil
-from lbmpy.maxwellian_equilibrium import get_weights
 
 from lbmpy.scenarios import create_fully_periodic_flow
 
@@ -50,7 +49,7 @@ def test_periodic_shear_layers(method, delta_equilibrium):
     pdfs_zero_centered = scenario_zero_centered.data_handling.cpu_arrays[scenario_zero_centered.pdf_array_name]
     difference = pdfs_full - pdfs_zero_centered
 
-    weights = np.array(get_weights(stencil))
+    weights = np.array(stencil.weights)
     reference = np.zeros(L + (stencil.Q, ))
     reference[:,:,:] = weights
 

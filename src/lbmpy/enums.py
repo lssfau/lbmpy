@@ -9,6 +9,7 @@ class Stencil(Enum):
 
     The number of spatial dimensions *d* and the number of discrete velocities *q* are stated in the DdQq notation
     """
+
     D2Q9 = auto()
     """
     A two dimensional stencil using 9 discrete velocities.
@@ -52,6 +53,7 @@ class Method(Enum):
     is essential for multiple relaxation rate methods. Important specific parameters are listed below to the enum value.
     A specific creation function is stated for each case which explains these parameters in detail.
     """
+
     SRT = auto()
     """
     See :func:`lbmpy.methods.create_srt`, 
@@ -137,6 +139,7 @@ class CollisionSpace(Enum):
     """
     The CollisionSpace enumeration lists all possible spaces for collision to occur in.
     """
+
     POPULATIONS = auto()
     """
     Population space, meaning post-collision populations are obtained directly by relaxation of linear combinations of
@@ -165,11 +168,24 @@ class CollisionSpace(Enum):
     def compatible(self, method: Method):
         """Determines if the given `lbmpy.enums.Method` is compatible with this collision space."""
         compat_dict = {
-            CollisionSpace.POPULATIONS: {Method.SRT, Method.TRT, Method.MRT_RAW, Method.MRT,
-                                         Method.TRT_KBC_N1, Method.TRT_KBC_N2, Method.TRT_KBC_N3, Method.TRT_KBC_N4},
-            CollisionSpace.RAW_MOMENTS: {Method.SRT, Method.TRT, Method.MRT_RAW, Method.MRT},
+            CollisionSpace.POPULATIONS: {
+                Method.SRT,
+                Method.TRT,
+                Method.MRT_RAW,
+                Method.MRT,
+                Method.TRT_KBC_N1,
+                Method.TRT_KBC_N2,
+                Method.TRT_KBC_N3,
+                Method.TRT_KBC_N4,
+            },
+            CollisionSpace.RAW_MOMENTS: {
+                Method.SRT,
+                Method.TRT,
+                Method.MRT_RAW,
+                Method.MRT,
+            },
             CollisionSpace.CENTRAL_MOMENTS: {Method.CENTRAL_MOMENT},
-            CollisionSpace.CUMULANTS: {Method.MONOMIAL_CUMULANT, Method.CUMULANT}
+            CollisionSpace.CUMULANTS: {Method.MONOMIAL_CUMULANT, Method.CUMULANT},
         }
 
         return method in compat_dict[self]
@@ -181,6 +197,7 @@ class ForceModel(Enum):
     of the lattice Boltzmann method. A short summary of the theory behind is shown in `lbmpy.forcemodels`.
     More precise definitions are given in Chapter 6 and 10 of :cite:`lbm_book`
     """
+
     SIMPLE = auto()
     """
     See :class:`lbmpy.forcemodels.Simple`
@@ -228,6 +245,7 @@ class SubgridScaleModel(Enum):
     The SubgridScaleModel enumeration defines which subgrid-scale model (SGS) is used to perform
     Large-Eddy-Simulations (LES).
     """
+
     SMAGORINSKY = auto()
     """
     See :func:`lbmpy.turbulence_models.add_smagorinsky_model`

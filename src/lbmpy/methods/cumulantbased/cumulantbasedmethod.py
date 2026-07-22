@@ -296,7 +296,7 @@ class CumulantBasedLbMethod(AbstractLbMethod):
         for w in weights:
             assert is_constant(w)
 
-        return [w for w in weights]
+        return tuple([w for w in weights])
 
     def _centered_cumulant_collision_rule(self, cumulant_to_relaxation_info_dict: OrderedDict,
                                           conserved_quantity_equations: AssignmentCollection = None,

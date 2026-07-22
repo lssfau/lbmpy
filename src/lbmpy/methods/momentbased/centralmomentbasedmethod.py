@@ -305,7 +305,7 @@ class CentralMomentBasedLbMethod(AbstractLbMethod):
         for w in weights:
             assert is_constant(w)
 
-        return [w for w in weights]
+        return tuple([w for w in weights])
 
     def _central_moment_collision_rule(self, moment_to_relaxation_info_dict: OrderedDict,
                                        conserved_quantity_equations: AssignmentCollection = None,

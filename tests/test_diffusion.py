@@ -13,7 +13,6 @@ from lbmpy.boundaries.boundaryhandling import LatticeBoltzmannBoundaryHandling
 from lbmpy.boundaries.boundaryconditions import DiffusionDirichlet, NeumannByCopy
 from lbmpy.geometry import add_box_boundary
 from lbmpy.stencils import LBStencil
-from lbmpy.maxwellian_equilibrium import get_weights
 
 import sympy as sp
 import numpy as np
@@ -22,7 +21,7 @@ import numpy as np
 def test_diffusion_boundary():
     domain_size = (10, 10)
     stencil = LBStencil(Stencil.D2Q9)
-    weights = get_weights(stencil)
+    weights = stencil.weights
     concentration = 1.0
 
     # Data Handling

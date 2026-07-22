@@ -34,6 +34,7 @@ Functions
 ~~~~~~~~~
 
 """
+
 import itertools
 import math
 from collections import Counter, defaultdict
@@ -45,8 +46,8 @@ import sympy as sp
 from pystencils.cache import memorycache
 from pystencils.sympyextensions import remove_higher_order_terms
 
-MOMENT_SYMBOLS = sp.symbols('x y z')
-T = TypeVar('T')
+MOMENT_SYMBOLS = sp.symbols("x y z")
+T = TypeVar("T")
 
 
 # ------------------------------ Discrete (Exponent Tuples) ------------------------------------------------------------
@@ -92,13 +93,15 @@ def moments_of_order(order, dim=3, include_permutations=True):
 
 
 def moments_up_to_order(order, dim=3, include_permutations=True):
-    """All tuples of length 'dim' which sum is smaller than 'order' """
-    single_moment_iterators = [moments_of_order(o, dim, include_permutations) for o in range(order + 1)]
+    """All tuples of length 'dim' which sum is smaller than 'order'"""
+    single_moment_iterators = [
+        moments_of_order(o, dim, include_permutations) for o in range(order + 1)
+    ]
     return tuple(itertools.chain(*single_moment_iterators))
 
 
 def moments_up_to_component_order(order, dim=3):
-    """All tuples of length 'dim' where each entry is smaller or equal to 'order' """
+    """All tuples of length 'dim' where each entry is smaller or equal to 'order'"""
     return tuple(itertools.product(*[range(order + 1)] * dim))
 
 
@@ -113,9 +116,11 @@ def extend_moments_with_permutations(exponent_tuples):
 def contained_moments(exponent_tuple, min_order=0, exclude_original=True):
     """Returns all moments contained in exponent_tuple, in the sense that their exponents are less than or
     equal to the corresponding exponents in exponent_tuple."""
-    return [t for t
-            in itertools.product(*(range(i + 1) for i in exponent_tuple))
-            if sum(t) >= min_order and (not exclude_original or t != exponent_tuple)]
+    return [
+        t
+        for t in itertools.product(*(range(i + 1) for i in exponent_tuple))
+        if sum(t) >= min_order and (not exclude_original or t != exponent_tuple)
+    ]
 
 
 # ------------------------------ Representation Conversions ------------------------------------------------------------
@@ -130,14 +135,16 @@ def exponent_to_polynomial_representation(exponent_tuple):
         x**2*y*z**3
     """
     poly = 1
-    for sym, tuple_entry in zip(MOMENT_SYMBOLS[:len(exponent_tuple)], exponent_tuple):
-        poly *= sym ** tuple_entry
+    for sym, tuple_entry in zip(MOMENT_SYMBOLS[: len(exponent_tuple)], exponent_tuple):
+        poly *= sym**tuple_entry
     return poly
 
 
 def exponents_to_polynomial_representations(sequence_of_exponent_tuples):
     """Applies :func:`exponent_to_polynomial_representation` to given sequence"""
-    return tuple([exponent_to_polynomial_representation(t) for t in sequence_of_exponent_tuples])
+    return tuple(
+        [exponent_to_polynomial_representation(t) for t in sequence_of_exponent_tuples]
+    )
 
 
 def polynomial_to_exponent_representation(polynomial, dim=3):
@@ -160,13 +167,28 @@ def polynomial_to_exponent_representation(polynomial, dim=3):
     for expr in summands:
         if len(expr.atoms(sp.Symbol) - set(MOMENT_SYMBOLS)) > 0:
             raise ValueError(f"Invalid moment polynomial: {str(expr)}")
-        c, x_exp, y_exp, z_exp = sp.Wild('c'), sp.Wild('xexp'), sp.Wild('yexp'), sp.Wild('zc')
+        c, x_exp, y_exp, z_exp = (
+            sp.Wild("c"),
+            sp.Wild("xexp"),
+            sp.Wild("yexp"),
+            sp.Wild("zc"),
+        )
         match_res = expr.match(c * x**x_exp * y**y_exp * z**z_exp)
-        assert match_res[x_exp].is_integer and match_res[y_exp].is_integer and match_res[z_exp].is_integer
-        exp_tuple = (int(match_res[x_exp]), int(match_res[y_exp]), int(match_res[z_exp]),)
+        assert (
+            match_res[x_exp].is_integer
+            and match_res[y_exp].is_integer
+            and match_res[z_exp].is_integer
+        )
+        exp_tuple = (
+            int(match_res[x_exp]),
+            int(match_res[y_exp]),
+            int(match_res[z_exp]),
+        )
         if dim < 3:
             for i in range(dim, 3):
-                assert exp_tuple[i] == 0, "Used symbols in polynomial are not representable in that dimension"
+                assert (
+                    exp_tuple[i] == 0
+                ), "Used symbols in polynomial are not representable in that dimension"
             exp_tuple = exp_tuple[:dim]
         coeff_exp_tuple_representation.append((match_res[c], exp_tuple))
     return coeff_exp_tuple_representation
@@ -174,7 +196,8 @@ def polynomial_to_exponent_representation(polynomial, dim=3):
 
 def moment_sort_key(moment):
     """Sort key function for moments to sort them by (in decreasing priority)
-     order, number of occuring symbols, length of string representation, string representation"""
+    order, number of occuring symbols, length of string representation, string representation
+    """
     mom_str = str(moment)
     return get_order(moment), len(moment.atoms(sp.Symbol)), len(mom_str), mom_str
 
@@ -190,6 +213,7 @@ def sort_moments_into_groups_of_same_order(moments):
         order = get_order(moment)
         result[order].append(moment)
     return result
+
 
 # -------------------- Common Function working with exponent tuples and polynomial moments -----------------------------
 
@@ -263,7 +287,9 @@ def get_order(moment):
         return 0
     leading_coefficient = sp.polys.polytools.LM(moment)
     symbols_in_leading_coefficient = leading_coefficient.atoms(sp.Symbol)
-    return sum([sp.degree(leading_coefficient, gen=m) for m in symbols_in_leading_coefficient])
+    return sum(
+        [sp.degree(leading_coefficient, gen=m) for m in symbols_in_leading_coefficient]
+    )
 
 
 def non_aliased_moment(moment_tuple: Sequence[int]) -> Tuple[int, ...]:
@@ -312,10 +338,10 @@ def aliases_from_moment_list(moment_exponents, stencil):
 
 def non_aliased_polynomial_raw_moments(polys, stencil, nested=False):
     """Takes a (potentially nested) list of raw moment polynomials and rewrites them by eliminating
-    any aliased monomials. 
+    any aliased monomials.
 
     All polynomials are expanded and occuring monomials are collected. Using `aliases_from_moment_list`,
-    aliases are eliminated and substituted in the polynomials. 
+    aliases are eliminated and substituted in the polynomials.
 
     Attention: Only use this method for monomials in raw moment space. It will produce wrong results
     if used for central moments, since there is no direct aliasing in central moment space!
@@ -325,7 +351,9 @@ def non_aliased_polynomial_raw_moments(polys, stencil, nested=False):
         polys_unnested = list(itertools.chain.from_iterable(polys))
     else:
         polys_unnested = polys
-    monos = sorted(extract_monomials(polys_unnested, dim=dim), key=exponent_tuple_sort_key)
+    monos = sorted(
+        extract_monomials(polys_unnested, dim=dim), key=exponent_tuple_sort_key
+    )
     aliases = aliases_from_moment_list(monos, stencil)
 
     if not aliases:  # Stop early if there are no aliases
@@ -334,7 +362,10 @@ def non_aliased_polynomial_raw_moments(polys, stencil, nested=False):
     def nonalias_polynomial(poly):
         exponents = polynomial_to_exponent_representation(poly, dim)
         exponents_unaliased = [(coeff, aliases.get(m, m)) for coeff, m in exponents]
-        return sum(coeff * exponent_to_polynomial_representation(m) for coeff, m in exponents_unaliased)
+        return sum(
+            coeff * exponent_to_polynomial_representation(m)
+            for coeff, m in exponents_unaliased
+        )
 
     if nested:
         output_polys = []
@@ -364,7 +395,8 @@ def is_bulk_moment(moment, dim):
 
 def is_shear_moment(moment, dim):
     """Shear moments are the quadratic polynomials except for the bulk moment.
-       Linear combinations with lower-order polynomials don't harm because these correspond to conserved moments."""
+    Linear combinations with lower-order polynomials don't harm because these correspond to conserved moments.
+    """
     if is_bulk_moment(moment, dim):
         return False
     if type(moment) is not tuple:
@@ -425,15 +457,22 @@ def moment_matrix(moments, stencil, shift_velocity=None):
         shift_velocity = (0,) * len(stencil[0])
 
     if type(moments[0]) is tuple:
+
         def generator(row, column):
             result = sp.Rational(1, 1)
-            for exponent, stencil_entry, shift in zip(moments[row], stencil[column], shift_velocity):
+            for exponent, stencil_entry, shift in zip(
+                moments[row], stencil[column], shift_velocity
+            ):
                 result *= (sp.sympify(stencil_entry) - shift) ** exponent
             return result
+
     else:
+
         def generator(row, column):
             evaluated = moments[row]
-            for var, stencil_entry, shift in zip(MOMENT_SYMBOLS, stencil[column], shift_velocity):
+            for var, stencil_entry, shift in zip(
+                MOMENT_SYMBOLS, stencil[column], shift_velocity
+            ):
                 evaluated = evaluated.subs(var, stencil_entry - shift)
             return evaluated
 
@@ -459,9 +498,13 @@ def set_up_shift_matrix(moments, stencil, velocity_symbols=sp.symbols("u_:3")):
 
     N = sp.simplify(MN * M.inv())
 
-    assert N.is_lower, "Calculating the shift matrix gave not a lower diagonal matrix. Thus it failed"
-    assert sum(N[i, i] for i in range(stencil.Q)) == stencil.Q, "Calculating the shift matrix failed. " \
+    assert (
+        N.is_lower
+    ), "Calculating the shift matrix gave not a lower diagonal matrix. Thus it failed"
+    assert sum(N[i, i] for i in range(stencil.Q)) == stencil.Q, (
+        "Calculating the shift matrix failed. "
         "There are entries on the diagonal which are not equal to one"
+    )
 
     return N
 
@@ -481,8 +524,9 @@ def gram_schmidt(moments, stencil, weights=None):
     """
     if weights is None:
         weights = sp.eye(stencil.Q)
-    if type(weights) is list:
-        assert len(weights) == stencil.Q
+    if not isinstance(weights, sp.Matrix):
+        if len(weights) != stencil.Q:
+            raise ValueError("Invalid number of weights")
         weights = sp.diag(*weights)
 
     if type(moments[0]) is tuple:
@@ -491,7 +535,9 @@ def gram_schmidt(moments, stencil, weights=None):
         moments = list(copy(moments))
 
     pdfs_to_moments = moment_matrix(moments, stencil).transpose()
-    moment_matrix_columns = [pdfs_to_moments.col(i) for i in range(pdfs_to_moments.cols)]
+    moment_matrix_columns = [
+        pdfs_to_moments.col(i) for i in range(pdfs_to_moments.cols)
+    ]
     orthogonalized_vectors = []
     for i in range(len(moment_matrix_columns)):
         current_element = moment_matrix_columns[i]
@@ -499,8 +545,10 @@ def gram_schmidt(moments, stencil, weights=None):
             prev_element = orthogonalized_vectors[j]
             denominator = prev_element.dot(weights * prev_element)
             if denominator == 0:
-                raise ValueError(f"Not an independent set of vectors given: "
-                                 f"vector {i} is dependent on previous vectors")
+                raise ValueError(
+                    f"Not an independent set of vectors given: "
+                    f"vector {i} is dependent on previous vectors"
+                )
             overlap = current_element.dot(weights * prev_element) / denominator
             current_element -= overlap * prev_element
             moments[i] -= overlap * moments[j]
@@ -516,36 +564,55 @@ def get_default_moment_set_for_stencil(stencil):
     to_poly = exponents_to_polynomial_representations
 
     if stencil.D == 2 and stencil.Q == 9:
-        return sorted(to_poly(moments_up_to_component_order(2, dim=2)), key=moment_sort_key)
+        return sorted(
+            to_poly(moments_up_to_component_order(2, dim=2)), key=moment_sort_key
+        )
 
     all27_moments = moments_up_to_component_order(2, dim=3)
     if stencil.D == 3 and stencil.Q == 27:
         return sorted(to_poly(all27_moments), key=moment_sort_key)
     if stencil.D == 3 and stencil.Q == 19:
         non_matched_moments = [(1, 2, 2), (1, 1, 2), (2, 2, 2), (1, 1, 1)]
-        moments19 = set(all27_moments) - set(extend_moments_with_permutations(non_matched_moments))
+        moments19 = set(all27_moments) - set(
+            extend_moments_with_permutations(non_matched_moments)
+        )
         return sorted(to_poly(moments19), key=moment_sort_key)
     if stencil.D == 3 and stencil.Q == 15:
         x, y, z = MOMENT_SYMBOLS
         non_matched_moments = [(1, 2, 0), (2, 2, 0), (1, 1, 2), (1, 2, 2), (2, 2, 2)]
-        additional_moments = (6 * (x ** 2 * y ** 2 + x ** 2 * z ** 2 + y ** 2 * z ** 2),
-                              3 * (x * (y ** 2 + z ** 2)),
-                              3 * (y * (x ** 2 + z ** 2)),
-                              3 * (z * (x ** 2 + y ** 2)),
-                              )
+        additional_moments = (
+            6 * (x**2 * y**2 + x**2 * z**2 + y**2 * z**2),
+            3 * (x * (y**2 + z**2)),
+            3 * (y * (x**2 + z**2)),
+            3 * (z * (x**2 + y**2)),
+        )
         to_remove = set(extend_moments_with_permutations(non_matched_moments))
-        return sorted(to_poly(set(all27_moments) - to_remove) + additional_moments, key=moment_sort_key)
+        return sorted(
+            to_poly(set(all27_moments) - to_remove) + additional_moments,
+            key=moment_sort_key,
+        )
     if stencil.D == 3 and stencil.Q == 7:
         x, y, z = MOMENT_SYMBOLS
-        non_matched_moments = [(1, 1, 0), (1, 1, 1), (1, 1, 2), (1, 2, 0),
-                               (1, 2, 2), (2, 0, 0), (2, 2, 0), (2, 2, 2)]
-        additional_moments = (x ** 2 - y ** 2,
-                              x ** 2 - z ** 2,
-                              x ** 2 + y ** 2 + z ** 2)
+        non_matched_moments = [
+            (1, 1, 0),
+            (1, 1, 1),
+            (1, 1, 2),
+            (1, 2, 0),
+            (1, 2, 2),
+            (2, 0, 0),
+            (2, 2, 0),
+            (2, 2, 2),
+        ]
+        additional_moments = (x**2 - y**2, x**2 - z**2, x**2 + y**2 + z**2)
         to_remove = set(extend_moments_with_permutations(non_matched_moments))
-        return sorted(to_poly(set(all27_moments) - to_remove) + additional_moments, key=moment_sort_key)
+        return sorted(
+            to_poly(set(all27_moments) - to_remove) + additional_moments,
+            key=moment_sort_key,
+        )
 
-    raise NotImplementedError("No default moment system available for this stencil - define matched moments yourself")
+    raise NotImplementedError(
+        "No default moment system available for this stencil - define matched moments yourself"
+    )
 
 
 def extract_monomials(sequence_of_polynomials, dim=3):
@@ -596,12 +663,14 @@ def monomial_to_polynomial_transformation_matrix(monomials, polynomials):
     return result
 
 
-def central_moment_reduced_monomial_to_polynomial_matrix(polynomials, stencil, velocity_symbols=None):
+def central_moment_reduced_monomial_to_polynomial_matrix(
+    polynomials, stencil, velocity_symbols=None
+):
     r"""
     Returns a transformation matrix from a reduced set of monomial central moments to a set of polynomial
     central moments.
 
-    Use for a set of :math:`q` central moment polynomials that reduces to a too-large set of :math:`r > q` 
+    Use for a set of :math:`q` central moment polynomials that reduces to a too-large set of :math:`r > q`
     monomials (as given by `extract_monomials`). Reduces the monomials by eliminating aliases in raw moment
     space, and computes a reduced polynomialization matrix :math:`\mathbf{P}^{r}` that computes the given
     polynomials from the reduced set of monomials.
@@ -611,13 +680,21 @@ def central_moment_reduced_monomial_to_polynomial_matrix(polynomials, stencil, v
         velocity_symbols = sp.symbols(f"u_:{dim}")
 
     reduced_polynomials = non_aliased_polynomial_raw_moments(polynomials, stencil)
-    reduced_monomials = sorted(extract_monomials(reduced_polynomials), key=exponent_tuple_sort_key)
+    reduced_monomials = sorted(
+        extract_monomials(reduced_polynomials), key=exponent_tuple_sort_key
+    )
 
-    assert len(reduced_monomials) == stencil.Q, "Could not extract a base set of correct size from the polynomials."
+    assert (
+        len(reduced_monomials) == stencil.Q
+    ), "Could not extract a base set of correct size from the polynomials."
 
-    N = set_up_shift_matrix(reduced_monomials, stencil, velocity_symbols=velocity_symbols)
+    N = set_up_shift_matrix(
+        reduced_monomials, stencil, velocity_symbols=velocity_symbols
+    )
     N_P = set_up_shift_matrix(polynomials, stencil, velocity_symbols=velocity_symbols)
-    P_mono = monomial_to_polynomial_transformation_matrix(reduced_monomials, reduced_polynomials)
+    P_mono = monomial_to_polynomial_transformation_matrix(
+        reduced_monomials, reduced_polynomials
+    )
 
     P_reduced = (N_P * P_mono * N.inv()).expand()
     return P_reduced, reduced_monomials
@@ -626,8 +703,13 @@ def central_moment_reduced_monomial_to_polynomial_matrix(polynomials, stencil, v
 # ---------------------------------- Visualization ---------------------------------------------------------------------
 
 
-def moment_equality_table(stencil, discrete_equilibrium=None, continuous_equilibrium=None,
-                          max_order=4, truncate_order=3):
+def moment_equality_table(
+    stencil,
+    discrete_equilibrium=None,
+    continuous_equilibrium=None,
+    max_order=4,
+    truncate_order=3,
+):
     """
     Creates a table showing which moments of a discrete stencil/equilibrium coincide with the
     corresponding continuous moments
@@ -649,53 +731,75 @@ def moment_equality_table(stencil, discrete_equilibrium=None, continuous_equilib
     u = sp.symbols(f"u_:{stencil.D}")
     if discrete_equilibrium is None:
         from lbmpy.maxwellian_equilibrium import discrete_maxwellian_equilibrium
-        discrete_equilibrium = discrete_maxwellian_equilibrium(stencil, c_s_sq=sp.Rational(1, 3), compressible=True,
-                                                               u=u, order=truncate_order)
+
+        discrete_equilibrium = discrete_maxwellian_equilibrium(
+            stencil,
+            c_s_sq=sp.Rational(1, 3),
+            compressible=True,
+            u=u,
+            order=truncate_order,
+        )
     if continuous_equilibrium is None:
         from lbmpy.maxwellian_equilibrium import continuous_maxwellian_equilibrium
-        continuous_equilibrium = continuous_maxwellian_equilibrium(dim=stencil.D, u=u, c_s_sq=sp.Rational(1, 3))
+
+        continuous_equilibrium = continuous_maxwellian_equilibrium(
+            dim=stencil.D, u=u, c_s_sq=sp.Rational(1, 3)
+        )
 
     table = []
     matched_moments = 0
     non_matched_moments = 0
 
-    moments_list = [list(moments_of_order(o, stencil.D, include_permutations=False)) for o in range(max_order + 1)]
+    moments_list = [
+        list(moments_of_order(o, stencil.D, include_permutations=False))
+        for o in range(max_order + 1)
+    ]
 
     colors = dict()
     nr_of_columns = max([len(v) for v in moments_list]) + 1
 
-    header_row = [' '] * nr_of_columns
-    header_row[0] = 'order'
+    header_row = [" "] * nr_of_columns
+    header_row[0] = "order"
     table.append(header_row)
 
     for order, moments in enumerate(moments_list):
-        row = [' '] * nr_of_columns
-        row[0] = f'{order}'
+        row = [" "] * nr_of_columns
+        row[0] = f"{order}"
         for moment, col_idx in zip(moments, range(1, len(row))):
             multiplicity = moment_multiplicity(moment)
             dm = discrete_moment(discrete_equilibrium, moment, stencil)
-            cm = continuous_moment(continuous_equilibrium, moment, symbols=sp.symbols("v_0 v_1 v_2")[:stencil.D])
+            cm = continuous_moment(
+                continuous_equilibrium,
+                moment,
+                symbols=sp.symbols("v_0 v_1 v_2")[: stencil.D],
+            )
             difference = sp.simplify(dm - cm)
             if truncate_order:
-                difference = sp.simplify(remove_higher_order_terms(difference, symbols=u, order=truncate_order))
+                difference = sp.simplify(
+                    remove_higher_order_terms(
+                        difference, symbols=u, order=truncate_order
+                    )
+                )
             if difference != 0:
-                colors[(order + 1, col_idx)] = 'Orange'
+                colors[(order + 1, col_idx)] = "Orange"
                 non_matched_moments += multiplicity
             else:
-                colors[(order + 1, col_idx)] = 'lightGreen'
+                colors[(order + 1, col_idx)] = "lightGreen"
                 matched_moments += multiplicity
 
-            row[col_idx] = f'{moment}  x {moment_multiplicity(moment)}'
+            row[col_idx] = f"{moment}  x {moment_multiplicity(moment)}"
 
         table.append(row)
 
     table_display = ipy_table.make_table(table)
-    ipy_table.set_row_style(0, color='#ddd')
+    ipy_table.set_row_style(0, color="#ddd")
     for cell_idx, color in colors.items():
         ipy_table.set_cell_style(cell_idx[0], cell_idx[1], color=color)
 
-    print(f"Matched moments {matched_moments} - non matched moments {non_matched_moments} "
-          f"- total {matched_moments + non_matched_moments}")
+    print(
+        f"Matched moments {matched_moments} - non matched moments {non_matched_moments} "
+        f"- total {matched_moments + non_matched_moments}"
+    )
 
     return table_display
 
@@ -728,28 +832,43 @@ def moment_equality_table_by_stencil(name_to_stencil_dict, moments, truncate_ord
     for stencil_idx, stencil in enumerate(stencils):
         dim = stencil.D
         u = sp.symbols(f"u_:{dim}")
-        discrete_equilibrium = discrete_maxwellian_equilibrium(stencil, c_s_sq=sp.Rational(1, 3), compressible=True,
-                                                               u=u, order=truncate_order)
-        continuous_equilibrium = continuous_maxwellian_equilibrium(dim=dim, u=u, c_s_sq=sp.Rational(1, 3))
+        discrete_equilibrium = discrete_maxwellian_equilibrium(
+            stencil,
+            c_s_sq=sp.Rational(1, 3),
+            compressible=True,
+            u=u,
+            order=truncate_order,
+        )
+        continuous_equilibrium = continuous_maxwellian_equilibrium(
+            dim=dim, u=u, c_s_sq=sp.Rational(1, 3)
+        )
 
         for moment_idx, moment in enumerate(moments):
             moment = moment[:dim]
             dm = discrete_moment(discrete_equilibrium, moment, stencil)
-            cm = continuous_moment(continuous_equilibrium, moment, symbols=sp.symbols("v_0 v_1 v_2")[:dim])
+            cm = continuous_moment(
+                continuous_equilibrium, moment, symbols=sp.symbols("v_0 v_1 v_2")[:dim]
+            )
             difference = sp.simplify(dm - cm)
             if truncate_order:
-                difference = sp.simplify(remove_higher_order_terms(difference, symbols=u, order=truncate_order))
-            colors[(moment_idx + 1, stencil_idx + 2)] = 'Orange' if difference != 0 else 'lightGreen'
+                difference = sp.simplify(
+                    remove_higher_order_terms(
+                        difference, symbols=u, order=truncate_order
+                    )
+                )
+            colors[(moment_idx + 1, stencil_idx + 2)] = (
+                "Orange" if difference != 0 else "lightGreen"
+            )
 
     table = []
-    header_row = [' ', '#'] + stencil_names
+    header_row = [" ", "#"] + stencil_names
     table.append(header_row)
     for moment in moments:
-        row = [str(moment), str(moment_multiplicity(moment))] + [' '] * len(stencils)
+        row = [str(moment), str(moment_multiplicity(moment))] + [" "] * len(stencils)
         table.append(row)
 
     table_display = ipy_table.make_table(table)
-    ipy_table.set_row_style(0, color='#ddd')
+    ipy_table.set_row_style(0, color="#ddd")
     for cell_idx, color in colors.items():
         ipy_table.set_cell_style(cell_idx[0], cell_idx[1], color=color)
 
@@ -757,6 +876,7 @@ def moment_equality_table_by_stencil(name_to_stencil_dict, moments, truncate_ord
 
 
 # --------------------------------------- Internal Functions -----------------------------------------------------------
+
 
 def __unique(seq: Sequence[T]) -> List[T]:
     """Removes duplicates from a sequence in an order preserving way.
@@ -794,9 +914,12 @@ def __unique_permutations(elements: Sequence[T]) -> Iterable[T]:
                 yield (first_element,) + sub_permutation
 
 
-def __fixed_sum_tuples(tuple_length: int, tuple_sum: int,
-                       allowed_values: Optional[Sequence[int]] = None,
-                       ordered: bool = False) -> Iterable[Tuple[int, ...]]:
+def __fixed_sum_tuples(
+    tuple_length: int,
+    tuple_sum: int,
+    allowed_values: Optional[Sequence[int]] = None,
+    ordered: bool = False,
+) -> Iterable[Tuple[int, ...]]:
     """Generates all possible tuples of positive integers with a fixed sum of all entries.
 
     Args:
