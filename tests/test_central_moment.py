@@ -4,7 +4,6 @@ import sympy as sp
 from lbmpy.creationfunctions import create_lb_method, LBMConfig
 from lbmpy.enums import Method, Stencil
 from lbmpy.forcemodels import Luo
-from lbmpy.maxwellian_equilibrium import get_weights
 from lbmpy.moments import moment_matrix, set_up_shift_matrix
 from lbmpy.methods.creationfunctions import cascaded_moment_sets_literature
 from lbmpy.scenarios import create_lid_driven_cavity
@@ -84,7 +83,7 @@ def test_central_moment_class():
     assert M == moment_matrix(moments, stencil=stencil)
     assert N == set_up_shift_matrix(moments, stencil=stencil)
 
-    assert get_weights(stencil) == method.weights
+    assert stencil.weights == method.weights
 
     cqc = method.conserved_quantity_computation
     subs = {cqc.density_deviation_symbol : cqc.density_symbol - cqc.background_density}

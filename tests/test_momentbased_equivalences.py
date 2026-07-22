@@ -13,7 +13,6 @@ from lbmpy.stencils import LBStencil
 
 from lbmpy.methods.creationfunctions import create_srt
 from lbmpy.methods.default_moment_sets import mrt_orthogonal_modes_literature
-from lbmpy.maxwellian_equilibrium import get_weights
 
 from lbmpy.moment_transforms import (
     PdfsToMomentsByMatrixTransform, PdfsToMomentsByChimeraTransform
@@ -177,7 +176,7 @@ def test_zero_centering_equilibrium_equivalence(stencil, compressible, delta_eq)
     stencil = LBStencil(stencil)
     omega = sp.Symbol('omega')
 
-    weights = sp.Matrix(get_weights(stencil))
+    weights = sp.Matrix(stencil.weights)
 
     rho = sp.Symbol("rho")
     rho_background = sp.Integer(1)
@@ -205,7 +204,7 @@ def test_zero_centering_population_space_equivalence(stencil, compressible, delt
     stencil = LBStencil(stencil)
     omega = sp.Symbol('omega')
 
-    weights = sp.Matrix(get_weights(stencil))
+    weights = sp.Matrix(stencil.weights)
 
     rho = sp.Symbol("rho")
     rho_background = sp.Integer(1)

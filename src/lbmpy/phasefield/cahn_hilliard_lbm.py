@@ -1,6 +1,5 @@
 import sympy as sp
 
-from lbmpy.maxwellian_equilibrium import get_weights
 from lbmpy.equilibrium import GenericDiscreteEquilibrium
 from lbmpy.methods import DensityVelocityComputation
 from lbmpy.methods.creationfunctions import create_from_equilibrium
@@ -20,7 +19,7 @@ def cahn_hilliard_lb_method(stencil, mu, relaxation_rate=sp.Symbol("omega"), gam
         relaxation_rate: relaxation rate of method
         gamma: tunable parameter affecting the second order equilibrium moment
     """
-    weights = get_weights(stencil)
+    weights = stencil.weights
 
     kd = kronecker_delta
 

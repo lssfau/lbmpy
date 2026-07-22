@@ -14,7 +14,6 @@ def test_shan_chen_two_component():
     from lbmpy import LBMConfig, ForceModel, create_lb_update_rule
     from lbmpy.macroscopic_value_kernels import macroscopic_values_setter
     from lbmpy.creationfunctions import create_stream_pull_with_output_kernel
-    from lbmpy.maxwellian_equilibrium import get_weights
 
     N = 64
     omega_a = 1.
@@ -28,7 +27,7 @@ def test_shan_chen_two_component():
     rho0 = 1.
 
     stencil = lbmpy.LBStencil(Stencil.D2Q9)
-    weights = get_weights(stencil)
+    weights = stencil.weights
 
     dim = stencil.D
     dh = ps.create_data_handling((N,) * dim, periodicity=True, default_target=ps.Target.CPU)

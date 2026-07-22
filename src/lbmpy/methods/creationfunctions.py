@@ -9,7 +9,6 @@ from functools import reduce
 
 import sympy as sp
 
-from lbmpy.maxwellian_equilibrium import get_weights
 from lbmpy.equilibrium import ContinuousHydrodynamicMaxwellian, DiscreteHydrodynamicMaxwellian
 
 from lbmpy.methods.default_moment_sets import cascaded_moment_sets_literature
@@ -492,7 +491,7 @@ def create_mrt_orthogonal(stencil, relaxation_rates, continuous_equilibrium=True
     check_and_set_mrt_space(CollisionSpace.RAW_MOMENTS)
 
     if weighted:
-        weights = get_weights(stencil)
+        weights = stencil.weights
     else:
         weights = None
 

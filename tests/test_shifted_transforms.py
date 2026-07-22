@@ -2,7 +2,6 @@ import sympy as sp
 import pytest
 
 from lbmpy.stencils import LBStencil, Stencil
-from lbmpy.maxwellian_equilibrium import get_weights
 from lbmpy.equilibrium import default_background_distribution
 from lbmpy.moments import get_default_moment_set_for_stencil
 
@@ -20,7 +19,7 @@ transforms = [
 
 
 def check_shifts(stencil, transform_class):
-    weights = get_weights(stencil)
+    weights = stencil.weights
     bd = default_background_distribution(stencil.D)
     rho = bd.density
     u = bd.velocity
@@ -52,7 +51,7 @@ def check_shifts(stencil, transform_class):
     #   Test backward transforms
     bw_unshifted = transform_unshifted.backward_transform(fs).new_without_subexpressions()
     bw_shifted = transform_shifted.backward_transform(fs).new_without_subexpressions()
-    bw_delta = [(a.rhs - b.rhs).expand() for a, b in zip(bw_unshifted, bw_shifted)]
+    bw_delta = tuple([(a.rhs - b.rhs).expand() for a, b in zip(bw_unshifted, bw_shifted)])
     assert bw_delta == weights
 
 
